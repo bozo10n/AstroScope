@@ -1,23 +1,23 @@
-import logo from './logo.svg';
+import React, { useEffect } from 'react';
+import OpenSeadragon from 'openseadragon';
 import './App.css';
 
 function App() {
+  useEffect(() => {
+    const viewer = OpenSeadragon({
+      id: "openseadragon-viewer",
+      prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
+      tileSources: {
+        type: 'image',
+        url: 'https://picsum.photos/4000/3000'  // shows random image.
+      }
+    });
+  }, []);
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <h1>Space Viewer</h1>
+      <div id="openseadragon-viewer" style={{ width: '100%', height: '600px', border: '1px solid black' }}></div>
     </div>
   );
 }
