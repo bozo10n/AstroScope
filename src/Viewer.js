@@ -308,7 +308,6 @@ const Viewer = () => {
     
     // Function to join the room with the correct socket instance
     const doJoin = () => {
-      console.log('✅ Calling joinRoom with socket instance');
       // Pass the socket instance to ensure we use the correct socket
       joinRoom(roomId, userName.trim(), socketInstance);
       setIsJoined(true);
@@ -318,13 +317,11 @@ const Viewer = () => {
     if (socketInstance) {
       // If already connected, join immediately
       if (socketInstance.connected) {
-        console.log('✅ Socket already connected, joining room immediately');
         doJoin();
       } else {
         // Wait for connection event
-        console.log('⏳ Waiting for socket connection...');
+        console.log('Waiting for socket connection...');
         socketInstance.once('connect', () => {
-          console.log('✅ Socket connected, now joining room');
           doJoin();
         });
       }

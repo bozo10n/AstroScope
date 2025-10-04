@@ -19,7 +19,7 @@ export const useCollaborationStore = () => {
   const initSocket = useCallback(() => {
     // If socket already exists and is connected, reuse it
     if (socket && (socket.connected || socket.connecting)) {
-      console.log('♻️ Reusing existing socket connection');
+      console.log(' Reusing existing socket connection');
       return socket;
     }
     
@@ -46,14 +46,14 @@ export const useCollaborationStore = () => {
     });
 
     newSocket.on('connect_error', (error) => {
-      console.warn('❌ Server unavailable, enabling mock mode:', error.message);
+      console.warn('Server unavailable, enabling mock mode:', error.message);
       setConnected(false);
       setConnectionError(error.message);
       
       // Enable mock mode immediately
       setMockMode(true);
       setConnected(true); // Simulate connection for UI
-      console.log('🤖 Mock mode enabled for local development');
+      console.log('Mock mode enabled for local development');
       
       // Disconnect the socket to stop retry attempts
       newSocket.disconnect();
@@ -62,19 +62,19 @@ export const useCollaborationStore = () => {
     newSocket.on('disconnect', () => {
       if (!mockMode) {
         setConnected(false);
-        console.log('❌ Disconnected from server');
+        console.log(' Disconnected from server');
       }
     });
 
     newSocket.on('user-joined', ({ user, activeUsers }) => {
       setActiveUsers(activeUsers);
-      console.log(`✅ ${user.name} joined`);
+      console.log(`${user.name} joined`);
     });
 
     newSocket.on('user-left', ({ user, activeUsers }) => {
       setActiveUsers(activeUsers);
       userPositionsRef.current.delete(user.id);
-      console.log(`❌ ${user.name} left`);
+      console.log(` ${user.name} left`);
     });
 
     newSocket.on('position-update', (data) => {
@@ -97,17 +97,17 @@ export const useCollaborationStore = () => {
     });
 
     newSocket.on('existing-annotations', (annotations) => {
-      console.log('📝 Received existing annotations:', annotations);
+      console.log('Received existing annotations:', annotations);
       setAnnotations(annotations);
     });
 
     newSocket.on('existing-overlays', (overlays) => {
-      console.log('🖼️ Received existing overlays:', overlays);
+      console.log(' Received existing overlays:', overlays);
       setOverlays(overlays);
     });
 
     newSocket.on('annotation-added', (annotation) => {
-      console.log('➕ New annotation added from server:', annotation);
+      console.log('New annotation added from server:', annotation);
       setAnnotations(prev => {
         // Check if annotation already exists by comparing key properties
         // (avoid duplicates from optimistic updates)
@@ -120,7 +120,7 @@ export const useCollaborationStore = () => {
         );
         
         if (exists) {
-          console.log('⚠️ Annotation already exists locally, replacing with server version');
+          console.log(' Annotation already exists locally, replacing with server version');
           // Replace the optimistic version with the server version (has correct ID)
           return prev.map(a => 
             (Math.abs(a.x - annotation.x) < 0.001 && 
@@ -133,13 +133,13 @@ export const useCollaborationStore = () => {
         }
         
         const updated = [...prev, annotation];
-        console.log('📝 Updated annotations array:', updated);
+        console.log('Updated annotations array:', updated);
         return updated;
       });
     });
 
     newSocket.on('annotation-removed', ({ annotationId }) => {
-      console.log('➖ Annotation removed:', annotationId);
+      console.log('Annotation removed:', annotationId);
       setAnnotations(prev => prev.filter(a => a.id !== annotationId));
     });
 
@@ -188,14 +188,13 @@ export const useCollaborationStore = () => {
     setCurrentRoom(roomId);
 
     if (mockMode) {
-      console.log('🤖 Mock mode: Simulating room join');
+      console.log('Mock mode: Simulating room join');
       setActiveUsers([{ id: userId, name: userName, socketId: 'mock' }]);
       return;
     }
 
     // Use provided socket instance or fall back to state socket
     const activeSocket = socketInstance || socket;
-    console.log('📡 Emitting join-room event:', { roomId, userName, userId });
     activeSocket?.emit('join-room', {
       roomId,
       userName,
@@ -205,7 +204,6 @@ export const useCollaborationStore = () => {
 
   const updatePosition = useCallback((x, y, zoom) => {
     if (mockMode) {
-      console.log('🤖 Mock mode: Position update', { x, y, zoom });
       return;
     }
     socket?.emit('position-update', { x, y, zoom });
@@ -214,14 +212,12 @@ export const useCollaborationStore = () => {
   // New: Update 3D position with rotation
   const updatePosition3D = useCallback((x, y, z, pitch, yaw) => {
     if (mockMode) {
-      console.log('🤖 Mock mode: 3D Position update', { x, y, z, pitch, yaw });
       return;
     }
     socket?.emit('position-update-3d', { x, y, z, pitch, yaw });
   }, [socket, mockMode]);
 
   const addAnnotation = useCallback((text, x, y, z = undefined) => {
-    console.log('🎯 addAnnotation called:', { text, x, y, z, mockMode });
     
     // Create the annotation object (support both 2D and 3D annotations)
     const newAnnotation = {
@@ -237,28 +233,15 @@ export const useCollaborationStore = () => {
     };
     
     // Optimistically update local state immediately
-    console.log('✨ Adding annotation optimistically:', newAnnotation);
     setAnnotations(prev => {
       const updated = [...prev, newAnnotation];
-      console.log('📝 Annotations updated locally:', updated);
       return updated;
     });
     
     if (mockMode) {
-      console.log('🤖 Mock mode: Annotation added locally only');
       return;
     }
 
-    // Also emit to server for synchronization
-    console.log('📡 Emitting add-annotation to server:', {
-      roomId: currentRoom,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      text,
-      x,
-      y,
-      z
-    });
 
     socket?.emit('add-annotation', {
       roomId: currentRoom,
@@ -272,17 +255,14 @@ export const useCollaborationStore = () => {
   }, [socket, currentRoom, currentUser, mockMode]);
 
   const removeAnnotation = useCallback((annotationId) => {
-    console.log('🗑️ removeAnnotation called:', annotationId);
     
     // Optimistically update local state immediately
     setAnnotations(prev => {
       const filtered = prev.filter(a => a.id !== annotationId);
-      console.log('📝 Annotations after removal:', filtered);
       return filtered;
     });
     
     if (mockMode) {
-      console.log('🤖 Mock mode: Annotation removed locally only');
       return;
     }
 
@@ -308,17 +288,14 @@ export const useCollaborationStore = () => {
   }, [socket, currentRoom, currentUser]);
 
   const removeOverlay = useCallback((overlayId) => {
-    console.log('🗑️ removeOverlay called:', overlayId);
     
     // Optimistically update local state immediately
     setOverlays(prev => {
       const filtered = prev.filter(o => o.id !== overlayId);
-      console.log('🖼️ Overlays after removal:', filtered);
       return filtered;
     });
     
     if (mockMode) {
-      console.log('🤖 Mock mode: Overlay removed locally only');
       return;
     }
 
