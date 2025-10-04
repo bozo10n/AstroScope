@@ -7,10 +7,104 @@ import UserAvatar3D from './components/UserAvatar3D';
 import { useCollaborationStore } from './hooks/useCollaborationStore';
 
 /**
+ * Starry Sky Background
+ */
+function StarrySky() {
+  const starsRef = useRef();
+  
+  const starGeometry = React.useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    const starCount = 5000;
+    const positions = new Float32Array(starCount * 3);
+    
+    for (let i = 0; i < starCount * 3; i += 3) {
+      // Random position in a large sphere around the scene
+      const radius = 150 + Math.random() * 100;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      
+      positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+      positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      positions[i + 2] = radius * Math.cos(phi);
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    return geometry;
+  }, []);
+  
+  // Optional: Add subtle twinkling effect
+  useFrame((state) => {
+    if (starsRef.current) {
+      starsRef.current.rotation.y += 0.0001;
+    }
+  });
+  
+  return (
+    <points ref={starsRef} geometry={starGeometry}>
+      <pointsMaterial
+        size={0.5}
+        color="#ffffff"
+        sizeAttenuation={true}
+        transparent={true}
+        opacity={0.8}
+      />
+    </points>
+  );
+}
+
+/**
+ * Sun Light Component
+ */
+function SunLight() {
+  const sunRef = useRef();
+  const lightRef = useRef();
+  
+  // Sun position (far away to simulate distant sun)
+  const sunPosition = [100, 80, 50];
+  
+  return (
+    <group>
+      {/* Main sun directional light */}
+      <directionalLight
+        ref={lightRef}
+        position={sunPosition}
+        intensity={2.0}
+        color="#FFF8E7"
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={200}
+        shadow-camera-left={-100}
+        shadow-camera-right={100}
+        shadow-camera-top={100}
+        shadow-camera-bottom={-100}
+      />
+      
+      {/* Visual sun sphere - using meshBasicMaterial (always bright, unaffected by lights) */}
+      <mesh ref={sunRef} position={sunPosition}>
+        <sphereGeometry args={[3, 32, 32]} />
+        <meshBasicMaterial color="#FFD700" toneMapped={false} />
+      </mesh>
+      
+      {/* Sun glow effect */}
+      <mesh position={sunPosition}>
+        <sphereGeometry args={[5, 32, 32]} />
+        <meshBasicMaterial 
+          color="#FFD700" 
+          transparent 
+          opacity={0.3}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+/**
  * Moon Plane with height map
  */
-function MoonPlane({ heightScale }) {
-  const meshRef = useRef();
+const MoonPlane = React.forwardRef(({ heightScale }, ref) => {
   const [colorTexture, setColorTexture] = useState(null);
   const [heightTexture, setHeightTexture] = useState(null);
   
@@ -57,7 +151,7 @@ function MoonPlane({ heightScale }) {
   
   return (
     <mesh 
-      ref={meshRef} 
+      ref={ref} 
       geometry={geometry}
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, 0, 0]}
@@ -68,17 +162,19 @@ function MoonPlane({ heightScale }) {
       />
     </mesh>
   );
-}
+});
 
 /**
- * First Person Controls with position broadcasting
+ * First Person Controls with position broadcasting and collision detection
  */
 function CollaborativeFirstPersonControls({ 
   speed = 20, 
   updatePosition3D, 
-  isJoined 
+  isJoined,
+  terrainRef,
+  minHeight = 2.5  // Minimum height above terrain
 }) {
-  const { camera } = useThree();
+  const { camera, scene, raycaster } = useThree();
   const keysRef = useRef({});
   const lastUpdateTime = useRef(0);
   
@@ -122,6 +218,26 @@ function CollaborativeFirstPersonControls({
       camera.position.add(movement);
     }
     
+    // Collision detection with terrain
+    if (terrainRef && terrainRef.current) {
+      // Cast a ray downward from the camera
+      const rayOrigin = camera.position.clone();
+      const rayDirection = new THREE.Vector3(0, -1, 0);
+      
+      raycaster.set(rayOrigin, rayDirection);
+      const intersects = raycaster.intersectObject(terrainRef.current, true);
+      
+      if (intersects.length > 0) {
+        const terrainHeight = intersects[0].point.y;
+        const desiredHeight = terrainHeight + minHeight;
+        
+        // If camera is below minimum height, push it up
+        if (camera.position.y < desiredHeight) {
+          camera.position.y = desiredHeight;
+        }
+      }
+    }
+    
     // Broadcast position to other users (throttled to 10 times per second)
     if (isJoined && state.clock.elapsedTime - lastUpdateTime.current > 0.1) {
       lastUpdateTime.current = state.clock.elapsedTime;
@@ -162,7 +278,6 @@ function AnnotationPlacer({
   
   useEffect(() => {
     if (!isJoined) {
-      console.log('⚠️ Not joined, annotation placer disabled');
       return;
     }
     
@@ -172,11 +287,9 @@ function AnnotationPlacer({
         return;
       }
       
-      console.log('🎯 E key pressed, attempting to place annotation');
       
       // Don't place annotation if input is already visible
       if (inputVisible) {
-        console.log('⚠️ Input already visible, ignoring');
         return;
       }
       
@@ -184,7 +297,6 @@ function AnnotationPlacer({
       const x = 0;
       const y = 0;
       
-      console.log('🔍 Raycasting from center of screen...');
       
       // Raycast from center of screen to find intersection with terrain
       raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
@@ -194,18 +306,14 @@ function AnnotationPlacer({
       
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        console.log('✅ Placing annotation at:', point);
         setInputPosition({ x: point.x, y: point.y, z: point.z });
         setInputVisible(true);
       } else {
-        console.log('❌ No terrain found at crosshair - make sure you are looking at the terrain');
       }
     };
     
-    console.log('✅ Annotation placer initialized');
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      console.log('🧹 Annotation placer cleanup');
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isJoined, camera, raycaster, scene, gl, inputVisible]);
@@ -337,7 +445,7 @@ function CollaborativeThreeScene({
   
   // Debug logging
   useEffect(() => {
-    console.log('🔍 CollaborativeThreeScene state:', {
+    console.log(' CollaborativeThreeScene state:', {
       connected,
       mockMode,
       currentUserId: currentUser?.id,
@@ -349,7 +457,7 @@ function CollaborativeThreeScene({
   }, [connected, mockMode, currentUser, isJoined, activeUsers, annotations]);
   
   const handlePlaceAnnotation = useCallback((text, x, y, z) => {
-    console.log('📝 handlePlaceAnnotation called:', { text, x, y, z });
+    console.log('handlePlaceAnnotation called:', { text, x, y, z });
     addAnnotation(text, x, y, z);
   }, [addAnnotation]);
   
@@ -530,15 +638,23 @@ function CollaborativeThreeScene({
       <Canvas 
         camera={{ position: [0, 10, 30], fov: 75 }}
         onPointerDown={() => setLocked(true)}
+        style={{ background: '#000000' }}
       >
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[50, 50, 30]} intensity={1.2} />
-        <directionalLight position={[-50, 30, -30]} intensity={0.5} />
+        {/* Starry sky background */}
+        <StarrySky />
+        
+        {/* Lighting setup */}
+        <ambientLight intensity={0.2} />
+        <SunLight />
+        {/* Fill light from opposite side for subtle detail */}
+        <directionalLight position={[-50, 30, -30]} intensity={0.3} color="#9DB4FF" />
         
         <CollaborativeFirstPersonControls 
           speed={25} 
           updatePosition3D={updatePosition3D}
           isJoined={isJoined}
+          terrainRef={terrainRef}
+          minHeight={2.5}
         />
         
         <React.Suspense fallback={null}>
@@ -580,8 +696,6 @@ function CollaborativeThreeScene({
           onPlaceAnnotation={handlePlaceAnnotation}
           terrainRef={terrainRef}
         />
-        
-        <gridHelper args={[200, 50]} position={[0, -5, 0]} />
       </Canvas>
     </div>
   );

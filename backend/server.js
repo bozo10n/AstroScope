@@ -71,7 +71,6 @@ function initializeDatabase() {
     // Insert default room
     db.run("INSERT OR IGNORE INTO rooms (name, description) VALUES ('default', 'Default collaboration room')");
     
-    console.log('✅ Database tables initialized');
   });
 }
 
@@ -92,7 +91,6 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
 });
 
 io.on('connection', (socket) => {
-  console.log('👤 User connected:', socket.id);
   let currentRoom = null;
   let currentUser = null;
 
@@ -116,10 +114,8 @@ io.on('connection', (socket) => {
     // Send existing annotations to the joining user
     db.all('SELECT * FROM annotations WHERE room_id = ?', [roomId], (err, annotations) => {
       if (err) {
-        console.error('Error fetching annotations:', err);
         socket.emit('existing-annotations', []);
       } else {
-        console.log(`📝 Sending ${annotations.length} existing annotations to ${userName}`);
         socket.emit('existing-annotations', annotations);
       }
     });
@@ -127,10 +123,8 @@ io.on('connection', (socket) => {
     // Send existing overlays to the joining user
     db.all('SELECT * FROM image_overlays WHERE room_id = ?', [roomId], (err, overlays) => {
       if (err) {
-        console.error('Error fetching overlays:', err);
         socket.emit('existing-overlays', []);
       } else {
-        console.log(`🖼️ Sending ${overlays.length} existing overlays to ${userName}`);
         socket.emit('existing-overlays', overlays);
       }
     });
@@ -148,7 +142,6 @@ io.on('connection', (socket) => {
       activeUsers 
     });
     
-    console.log(`✅ ${userName} joined room ${roomId} (${activeUsers.length} users active)`);
   });
 
   socket.on('position-update', (data) => {
@@ -173,14 +166,12 @@ io.on('connection', (socket) => {
 
   socket.on('add-annotation', (data) => {
     const { roomId, userId, userName, text, x, y, z } = data;
-    console.log(`➕ Adding annotation from ${userName}: "${text}" at (${x}, ${y}, ${z || 'N/A'})`);
     
     db.run(
       'INSERT INTO annotations (room_id, user_id, user_name, text, x, y, z) VALUES (?, ?, ?, ?, ?, ?, ?)', 
       [roomId, userId, userName, text, x, y, z || null], 
       function(err) {
         if (err) {
-          console.error('❌ Failed to save annotation:', err);
           socket.emit('error', { message: 'Failed to save annotation' });
         } else {
           const annotation = { 
@@ -194,7 +185,6 @@ io.on('connection', (socket) => {
             z: z || null,
             timestamp: new Date().toISOString() 
           };
-          console.log(`✅ Annotation saved with ID ${this.lastID}, broadcasting to room ${roomId}`);
           
           // Broadcast to ALL users in the room (including sender for confirmation)
           io.to(roomId).emit('annotation-added', annotation);
@@ -205,14 +195,11 @@ io.on('connection', (socket) => {
 
   socket.on('remove-annotation', (data) => {
     const { annotationId, roomId } = data;
-    console.log(`🗑️ Removing annotation ${annotationId} from room ${roomId}`);
     
     db.run('DELETE FROM annotations WHERE id = ?', [annotationId], (err) => {
       if (err) {
-        console.error('❌ Failed to remove annotation:', err);
         socket.emit('error', { message: 'Failed to remove annotation' });
       } else {
-        console.log(`✅ Annotation ${annotationId} removed, broadcasting to room ${roomId}`);
         // Broadcast to ALL users in the room
         io.to(roomId).emit('annotation-removed', { annotationId });
       }
@@ -221,14 +208,12 @@ io.on('connection', (socket) => {
 
   socket.on('add-overlay', (data) => {
     const { roomId, userId, userName, imagePath, originalName, x, y, width, height } = data;
-    console.log(`➕ Adding overlay from ${userName}: ${originalName}`);
     
     db.run(
       'INSERT INTO image_overlays (room_id, user_id, user_name, image_path, original_name, x, y, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
       [roomId, userId, userName, imagePath, originalName, x, y, width, height], 
       function(err) {
         if (err) {
-          console.error('❌ Failed to save overlay:', err);
           socket.emit('error', { message: 'Failed to save overlay' });
         } else {
           const overlay = {
@@ -244,7 +229,6 @@ io.on('connection', (socket) => {
             height, 
             timestamp: new Date().toISOString()
           };
-          console.log(`✅ Overlay saved with ID ${this.lastID}, broadcasting to room ${roomId}`);
           
           // Broadcast to ALL users in the room
           io.to(roomId).emit('overlay-added', overlay);
@@ -255,7 +239,6 @@ io.on('connection', (socket) => {
 
   socket.on('remove-overlay', (data) => {
     const { overlayId, roomId } = data;
-    console.log(`🗑️ Removing overlay ${overlayId} from room ${roomId}`);
     
     // Get the image path before deleting
     db.get('SELECT image_path FROM image_overlays WHERE id = ?', [overlayId], (err, row) => {
@@ -263,17 +246,15 @@ io.on('connection', (socket) => {
         // Delete the image file
         const filePath = path.join(__dirname, row.image_path);
         fs.unlink(filePath, (e) => { 
-          if (e) console.error('❌ Error deleting file:', e); 
+          if (e) console.error(' Error deleting file:', e); 
         });
       }
       
       // Delete from database
       db.run('DELETE FROM image_overlays WHERE id = ?', [overlayId], (err) => {
         if (err) {
-          console.error('❌ Failed to remove overlay:', err);
           socket.emit('error', { message: 'Failed to remove overlay' });
         } else {
-          console.log(`✅ Overlay ${overlayId} removed, broadcasting to room ${roomId}`);
           // Broadcast to ALL users in the room
           io.to(roomId).emit('overlay-removed', { overlayId });
         }
@@ -284,7 +265,7 @@ io.on('connection', (socket) => {
   socket.on('update-annotation-position', (data) => {
     const { annotationId, roomId, x, y } = data;
     db.run('UPDATE annotations SET x = ?, y = ? WHERE id = ?', [x, y, annotationId], (err) => {
-      if (err) console.error('Failed to update annotation position:', err);
+      if (err) socket.emit('error', { message: 'Failed to update annotation position' });
       else {
         // Broadcast to all clients in the room (including sender for confirmation)
         io.to(roomId).emit('annotation-position-updated', { annotationId, x, y });
@@ -323,11 +304,10 @@ io.on('connection', (socket) => {
         io.to(currentRoom).emit('user-left', { user: currentUser, activeUsers });
         if (roomUsers.size === 0) rooms.delete(currentRoom);
       }
-      console.log('❌ ' + currentUser.name + ' left room ' + currentRoom);
+      socket.emit('user-left', { user: currentUser, activeUsers });
     }
-    console.log('👤 User disconnected:', socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => console.log('🚀 Server running on http://localhost:' + PORT));
+httpServer.listen(PORT, () => console.log('Server running on http://localhost:' + PORT));
