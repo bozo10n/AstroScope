@@ -43,56 +43,112 @@ function App() {
       springStiffness: 7.0
     });
 
-    viewerRef.current = viewer;
+        viewerRef.current = viewer;
 
-    viewer.addHandler('open', function() {
-      console.log('DZI image loaded successfully');
-    });
+        // handle clicks on the image
+        viewer.addHandler('canvas-click', function (event) {
+            if (!event.quick) return;
 
-    viewer.addHandler('open-failed', function(event) {
-      console.error('Failed to load DZI image:', event);
-    });
+            // store click position
+            const viewportPoint = viewer.viewport.pointFromPixel(event.position);
+            const pixelPoint = event.position;
 
-    viewer.addHandler('canvas-click', function(event) {
-      if (!event.quick) return;
-      
-      const viewportPoint = viewer.viewport.pointFromPixel(event.position);
-      
-      const annotation = document.createElement("div");
-      annotation.className = "annotation";
-      annotation.textContent = "⚫";
-      annotation.style.fontSize = "30px";
-      
-      viewer.addOverlay({
-        element: annotation,
-        location: viewportPoint
-      });
-      
-      console.log('Added annotation at:', viewportPoint);
-    });
+            // record where the input should appear (screen coordinates)
+            setInputVisible(true);
+            setInputPosition({ x: pixelPoint.x, y: pixelPoint.y });
 
-  }, []);
+            // store the viewport position for later when saving
+            viewerRef.current.tempAnnotationLocation = viewportPoint;
+        });
 
-  return (
-    <div className="App">
-      <h1>Space Viewer</h1>
-      <button onClick={() => setShow3D(!show3D)}>
-        {show3D ? 'Show 2D View' : 'Show 3D View'}
-      </button>
-      
-      {!show3D ? (
-        <div>
-          <h2>2D View - Click to Add Annotations</h2>
-          <div id="openseadragon-viewer" style={{ width: '100%', height: '600px', border: '1px solid black' }}></div>
+        return () => viewer.destroy();
+    }, []);
+
+    // function to save annotation
+    const saveAnnotation = () => {
+        const viewer = viewerRef.current;
+        const viewportPoint = viewer.tempAnnotationLocation;
+
+        if (!inputText.trim()) {
+            setInputVisible(false);
+            setInputText('');
+            return;
+        }
+
+        // create the visible annotation label
+        const annotation = document.createElement('div');
+        annotation.className = 'visible-anno-label';
+        annotation.textContent = inputText;
+
+        viewer.addOverlay({
+            element: annotation,
+            location: viewportPoint,
+        });
+
+        console.log('Added annotation:', inputText, 'at', viewportPoint);
+
+        setInputVisible(false);
+        setInputText('');
+    };
+
+    // function to cancel input
+    const cancelAnnotation = () => {
+        setInputVisible(false);
+        setInputText('');
+    };
+
+    return (
+        <div className="App">
+            <h1>Space Viewer</h1>
+
+            <button onClick={() => setShow3D(!show3D)}>
+                {show3D ? 'Show 2D View' : 'Show 3D View'}
+            </button>
+
+            {!show3D ? (
+                <div style={{ position: 'relative' }}>
+                    <h2>2D View - Click to Add Annotations</h2>
+                    <div
+                        id="openseadragon-viewer"
+                        style={{
+                            width: '100%',
+                            height: '600px',
+                            border: '1px solid black',
+                        }}
+                    ></div>
+
+                    {/* custom input box */}
+                    {inputVisible && (
+                        <div
+                            className="annotationInput"
+                            style={{
+                                top: inputPosition.y,
+                                left: inputPosition.x,
+                            }}
+                        >
+                            <input
+                                type="text"
+                                placeholder="Enter annotation text..."
+                                value={inputText}
+                                onChange={(e) => setInputText(e.target.value)}
+                            />
+                            <div className="controls">
+                                <button className="secondary" onClick={cancelAnnotation}>
+                                    Cancel
+                                </button>
+                                <button onClick={saveAnnotation}>Save</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div>
+                    <h2>3D View</h2>
+                    <ThreeScene imageUrl={imageUrl} />
+                </div>
+            )}
         </div>
-      ) : (
-        <div>
-          <h2>3D View</h2>
-          <ThreeScene imageUrl={imageUrl}/>
-        </div>
-      )}
-    </div>
-  );
+    );
 }
 
 export default App;
