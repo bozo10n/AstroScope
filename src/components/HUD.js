@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './HUD.css';
+import { exportAnnotationsToPDF, exportSingleAnnotationPDF } from '../utils/pdfExport';
 
 /**
  * HUD (Heads-Up Display) Component
@@ -10,10 +11,15 @@ function HUD({
   annotations = [],
   activeUsers = [],
   onTeleport,
+  onRemoveAnnotation,
   show = true,
-  currentUserId
+  currentUserId,
+  currentUser,
+  uiMode = false,
+  locked = false
 }) {
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
+  const [exportStatus, setExportStatus] = useState(null);
 
   if (!show) return null;
 
@@ -48,6 +54,40 @@ function HUD({
     }
   };
 
+  const handleExportPDF = () => {
+    try {
+      const filename = exportAnnotationsToPDF(annotations, currentUser, activeUsers);
+      setExportStatus(`✅ Exported: ${filename}`);
+      setTimeout(() => setExportStatus(null), 3000);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      setExportStatus('❌ Export failed');
+      setTimeout(() => setExportStatus(null), 3000);
+    }
+  };
+
+  const handleExportSingleAnnotation = (annotation, event) => {
+    event.stopPropagation(); // Prevent teleport
+    try {
+      const filename = exportSingleAnnotationPDF(annotation, currentUser);
+      setExportStatus(`✅ Exported: ${filename}`);
+      setTimeout(() => setExportStatus(null), 3000);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      setExportStatus('❌ Export failed');
+      setTimeout(() => setExportStatus(null), 3000);
+    }
+  };
+
+  const handleDeleteAnnotation = (annotation, event) => {
+    event.stopPropagation(); // Prevent teleport
+    if (window.confirm(`Delete annotation "${annotation.text}"?`)) {
+      if (onRemoveAnnotation) {
+        onRemoveAnnotation(annotation.id);
+      }
+    }
+  };
+
   return (
     <div className="hud-container">
       {/* Left Side - Annotation List with Teleport */}
@@ -55,7 +95,21 @@ function HUD({
         <div className="hud-header">
           <span className="hud-icon">📍</span>
           <div className="hud-title">Locations ({annotationsWithDistance.length})</div>
+          <button 
+            className="hud-export-btn"
+            onClick={handleExportPDF}
+            disabled={annotationsWithDistance.length === 0}
+            title="Export all annotations as PDF report"
+          >
+            📄 Export PDF
+          </button>
         </div>
+        
+        {exportStatus && (
+          <div className="hud-export-status">
+            {exportStatus}
+          </div>
+        )}
         
         <div className="hud-annotations-list">
           {annotationsWithDistance.length === 0 ? (
@@ -96,8 +150,28 @@ function HUD({
                     ({(annotation.x || 0).toFixed(0)}, {(annotation.y || 0).toFixed(0)}, {(annotation.z || 0).toFixed(0)})
                   </div>
                   
-                  <div className="hud-teleport-hint">
-                    Click to teleport →
+                  <div className="hud-annotation-actions">
+                    <div className="hud-teleport-hint">
+                      {uiMode ? 'Click to teleport' : 'Press TAB for UI mode'} →
+                    </div>
+                    <div className="hud-annotation-buttons">
+                      <button 
+                        className="hud-annotation-export-btn"
+                        onClick={(e) => handleExportSingleAnnotation(annotation, e)}
+                        title="Export this location as PDF"
+                      >
+                        📄
+                      </button>
+                      {isOwn && (
+                        <button 
+                          className="hud-annotation-delete-btn"
+                          onClick={(e) => handleDeleteAnnotation(annotation, e)}
+                          title="Delete this annotation"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -132,9 +206,17 @@ function HUD({
           <span className="hud-separator">•</span>
           <span className="hud-key">E</span> Annotate
           <span className="hud-separator">•</span>
-          <span className="hud-key">Click</span> Teleport
+          <span className="hud-key">TAB</span> Toggle UI
           <span className="hud-separator">•</span>
-          <span className="hud-key">ESC</span> Exit
+          {uiMode ? (
+            <>
+              <span className="hud-key">Click</span> Interact
+            </>
+          ) : (
+            <>
+              <span className="hud-key">❌ Button</span> Exit
+            </>
+          )}
         </div>
       </div>
     </div>

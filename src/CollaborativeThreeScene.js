@@ -175,11 +175,23 @@ function CollaborativeFirstPersonControls({
   terrainRef,
   minHeight = 2.5,  // Minimum height above terrain
   onPositionChange,  // Callback to update position in parent
-  teleportTo  // External teleport trigger
+  teleportTo,  // External teleport trigger
+  onLockChange,  // Callback when lock state changes
+  uiMode = false,  // True when user is interacting with UI
+  isAnnotating = false  // True when placing annotation
 }) {
-  const { camera, scene, raycaster } = useThree();
+  const { camera, scene, raycaster, gl } = useThree();
   const keysRef = useRef({});
   const lastUpdateTime = useRef(0);
+  const controlsRef = useRef();
+  
+  // Disable pointer lock when entering UI mode
+  useEffect(() => {
+    if (uiMode && document.pointerLockElement) {
+      console.log('UI Mode enabled, exiting pointer lock');
+      document.exitPointerLock();
+    }
+  }, [uiMode]);
   
   // Handle teleport
   useEffect(() => {
@@ -209,6 +221,9 @@ function CollaborativeFirstPersonControls({
     const keys = keysRef.current;
     const moveSpeed = speed * delta;
     
+    // Disable movement when in UI mode or annotating
+    const movementEnabled = !uiMode && !isAnnotating;
+    
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
     const right = new THREE.Vector3();
@@ -216,12 +231,14 @@ function CollaborativeFirstPersonControls({
     
     const movement = new THREE.Vector3();
     
-    if (keys['KeyW']) movement.add(forward);
-    if (keys['KeyS']) movement.sub(forward);
-    if (keys['KeyD']) movement.add(right);
-    if (keys['KeyA']) movement.sub(right);
-    if (keys['Space']) movement.y += 1;
-    if (keys['ShiftLeft']) movement.y -= 1;
+    if (movementEnabled) {
+      if (keys['KeyW']) movement.add(forward);
+      if (keys['KeyS']) movement.sub(forward);
+      if (keys['KeyD']) movement.add(right);
+      if (keys['KeyA']) movement.sub(right);
+      if (keys['Space']) movement.y += 1;
+      if (keys['ShiftLeft']) movement.y -= 1;
+    }
     
     if (movement.length() > 0) {
       movement.normalize().multiplyScalar(moveSpeed);
@@ -278,13 +295,23 @@ function CollaborativeFirstPersonControls({
     }
   });
   
+  // Don't render PointerLockControls in UI mode
+  if (uiMode) {
+    return null;
+  }
+  
   return (
-    <>
-      <PointerLockControls 
-        onLock={() => console.log('Pointer locked')}
-        onUnlock={() => console.log('Pointer unlocked')}
-      />
-    </>
+    <PointerLockControls 
+      ref={controlsRef}
+      onLock={() => {
+        console.log('Pointer locked');
+        if (onLockChange) onLockChange(true);
+      }}
+      onUnlock={() => {
+        console.log('Pointer unlocked');
+        if (onLockChange) onLockChange(false);
+      }}
+    />
   );
 }
 
@@ -294,13 +321,21 @@ function CollaborativeFirstPersonControls({
 function AnnotationPlacer({ 
   isJoined, 
   onPlaceAnnotation,
-  terrainRef 
+  terrainRef,
+  onAnnotatingChange
 }) {
   const { camera, raycaster, scene, gl } = useThree();
   const [inputVisible, setInputVisible] = useState(false);
   const [inputPosition, setInputPosition] = useState({ x: 0, y: 0, z: 0 });
   const [inputText, setInputText] = useState('');
   const [screenPosition, setScreenPosition] = useState({ x: 0, y: 0 });
+  
+  // Notify parent when annotation input is visible
+  useEffect(() => {
+    if (onAnnotatingChange) {
+      onAnnotatingChange(inputVisible);
+    }
+  }, [inputVisible, onAnnotatingChange]);
   
   useEffect(() => {
     if (!isJoined) {
@@ -451,9 +486,11 @@ function CollaborativeThreeScene({
   collaborationData 
 }) {
   const [locked, setLocked] = useState(false);
+  const [uiMode, setUiMode] = useState(false); // True when user wants to interact with HUD
   const terrainRef = useRef();
   const [currentPosition, setCurrentPosition] = useState({ x: 0, y: 10, z: 30 });
   const [teleportTo, setTeleportTo] = useState(null);
+  const [isAnnotating, setIsAnnotating] = useState(false);
   
   // Use passed-in collaboration data if available, otherwise fall back to hook
   const fallbackStore = useCollaborationStore();
@@ -500,18 +537,75 @@ function CollaborativeThreeScene({
     setCurrentPosition(pos);
   }, []);
   
+  const handleLockChange = useCallback((isLocked) => {
+    console.log('Lock state changed to:', isLocked);
+    setLocked(isLocked);
+    if (!isLocked) {
+      setUiMode(false); // Reset UI mode when unlocking
+    }
+  }, []);
+  
+  const toggleUiMode = useCallback(() => {
+    setUiMode(prev => {
+      const newMode = !prev;
+      console.log('Toggling UI mode from', prev, 'to', newMode);
+      return newMode;
+    });
+  }, []);
+  
+  // Handle Tab key to toggle UI mode
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.key === 'Tab' || e.code === 'Tab') && locked) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Tab key pressed');
+        toggleUiMode();
+      }
+    };
+    
+    // Use capture phase to get the event before pointer lock controls
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [locked, toggleUiMode]);
+  
   return (
     <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
-      {/* HUD Component */}
-      {locked && isJoined && (
+      {/* HUD Component - show when locked or in UI mode */}
+      {(locked || uiMode) && isJoined && (
         <HUD
           position={currentPosition}
           annotations={annotations}
           activeUsers={activeUsers}
           onTeleport={handleTeleport}
-          show={locked}
+          onRemoveAnnotation={removeAnnotation}
+          show={locked || uiMode}
           currentUserId={currentUser?.id}
+          currentUser={currentUser}
+          uiMode={uiMode}
+          locked={locked}
         />
+      )}
+      
+      {/* UI Mode Indicator */}
+      {locked && uiMode && (
+        <div style={{
+          position: 'absolute',
+          bottom: 80,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 99,
+          background: 'rgba(0, 255, 0, 0.9)',
+          color: '#000',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          pointerEvents: 'none',
+          boxShadow: '0 0 20px rgba(0, 255, 0, 0.5)'
+        }}>
+          🖱️ UI MODE - Press TAB to return to camera control
+        </div>
       )}
       
       {!locked && (
@@ -552,9 +646,17 @@ function CollaborativeThreeScene({
                 (Aim at terrain and press E to add a note)
               </span>
             </div>
+            <div style={{ marginBottom: '10px' }}>
+              <strong style={{ color: '#FFA726' }}>UI Interaction:</strong><br/>
+              <strong>TAB</strong> - Toggle UI mode (click HUD elements)<br/>
+              <strong>❌ Button</strong> - Exit camera control<br/>
+              <span style={{ fontSize: '12px', color: '#999' }}>
+                (Use TAB to interact with annotations, export PDFs, etc.)
+              </span>
+            </div>
             <div>
-              <strong style={{ color: '#FFA726' }}>Controls:</strong><br/>
-              <strong>ESC</strong> - Exit pointer lock mode
+              <strong style={{ color: '#FF6B6B' }}>Exit:</strong><br/>
+              <strong>ESC</strong> or <strong>❌ Button</strong> - Leave camera control
             </div>
           </div>
           
@@ -688,7 +790,6 @@ function CollaborativeThreeScene({
       
       <Canvas 
         camera={{ position: [0, 10, 30], fov: 75 }}
-        onPointerDown={() => setLocked(true)}
         style={{ 
           background: '#000000',
           width: '100%',
@@ -715,6 +816,9 @@ function CollaborativeThreeScene({
           minHeight={2.5}
           onPositionChange={handlePositionChange}
           teleportTo={teleportTo}
+          onLockChange={handleLockChange}
+          uiMode={uiMode}
+          isAnnotating={isAnnotating}
         />
         
         <React.Suspense fallback={null}>
@@ -755,8 +859,71 @@ function CollaborativeThreeScene({
           isJoined={isJoined}
           onPlaceAnnotation={handlePlaceAnnotation}
           terrainRef={terrainRef}
+          onAnnotatingChange={setIsAnnotating}
         />
       </Canvas>
+      
+      {/* Control Buttons */}
+      {locked && (
+        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 99, display: 'flex', gap: '10px' }}>
+          {/* Toggle UI Mode Button */}
+          <button
+            onClick={toggleUiMode}
+            style={{
+              background: uiMode ? 'rgba(0, 255, 0, 0.9)' : 'rgba(100, 150, 255, 0.9)',
+              color: 'white',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              padding: '10px 15px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              boxShadow: uiMode ? '0 0 15px rgba(0, 255, 0, 0.5)' : '0 0 15px rgba(100, 150, 255, 0.5)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'scale(1)';
+            }}
+          >
+            {uiMode ? '🎮 Camera Mode' : '🖱️ UI Mode'}
+          </button>
+          
+          {/* Exit Button (only in camera mode) */}
+          {!uiMode && (
+            <button
+              onClick={() => {
+                document.exitPointerLock();
+                setLocked(false);
+              }}
+              style={{
+                background: 'rgba(255, 100, 100, 0.9)',
+                color: 'white',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                padding: '10px 15px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                boxShadow: '0 0 15px rgba(255, 100, 100, 0.5)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(255, 50, 50, 1)';
+                e.target.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(255, 100, 100, 0.9)';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              ❌ Exit
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@
   font-family: 'Courier New', monospace;
   color: #00ff00;
   z-index: 1000;
+  user-select: none;
 }
 
 /* Panel Positioning */
@@ -41,7 +42,7 @@
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  pointer-events: none;
+  pointer-events: none !important;
 }
 
 /* Header */
@@ -64,6 +65,49 @@
   color: #00ff00;
   text-transform: uppercase;
   letter-spacing: 1px;
+  flex: 1;
+}
+
+/* Export Button */
+.hud-export-btn {
+  background: rgba(0, 255, 0, 0.2);
+  color: #00ff00;
+  border: 1px solid rgba(0, 255, 0, 0.4);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  font-family: 'Courier New', monospace;
+}
+
+.hud-export-btn:hover:not(:disabled) {
+  background: rgba(0, 255, 0, 0.4);
+  border-color: #00ff00;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+.hud-export-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.hud-export-status {
+  background: rgba(0, 255, 0, 0.15);
+  border: 1px solid rgba(0, 255, 0, 0.3);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #00ff00;
+  margin-bottom: 10px;
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Annotations List */
@@ -173,17 +217,72 @@
   margin-bottom: 6px;
 }
 
+.hud-annotation-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .hud-teleport-hint {
   font-size: 11px;
   color: rgba(0, 255, 0, 0.6);
-  text-align: right;
   font-style: italic;
   opacity: 0;
   transition: opacity 0.2s ease;
+  flex: 1;
 }
 
 .hud-annotation-item:hover .hud-teleport-hint {
   opacity: 1;
+}
+
+.hud-annotation-export-btn {
+  background: rgba(0, 255, 0, 0.15);
+  color: #00ff00;
+  border: 1px solid rgba(0, 255, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.hud-annotation-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.hud-annotation-item:hover .hud-annotation-export-btn,
+.hud-annotation-item:hover .hud-annotation-delete-btn {
+  opacity: 1;
+}
+
+.hud-annotation-export-btn:hover {
+  background: rgba(0, 255, 0, 0.3);
+  border-color: #00ff00;
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
+}
+
+.hud-annotation-delete-btn {
+  background: rgba(255, 0, 0, 0.15);
+  color: #ff4444;
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.hud-annotation-delete-btn:hover {
+  background: rgba(255, 0, 0, 0.3);
+  border-color: #ff4444;
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(255, 0, 0, 0.4);
 }
 
 /* Empty Message */
