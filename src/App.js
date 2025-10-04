@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import OpenSeadragon from 'openseadragon';
 import ThreeScene from './ThreeScene';
 import './App.css';
+import MoonTerrain from './MoonTerrain';
 
 function App() {
   const viewerRef = useRef(null);
   const [show3D, setShow3D] = useState(false);
-  const imageUrl =  'https://picsum.photos/4000/3000';
+  const [showMoon, setShowMoon] = useState(false);
+  const imageUrl = 'https://picsum.photos/4000/3000';
 
   useEffect(() => {
     const viewer = OpenSeadragon({
@@ -14,7 +16,7 @@ function App() {
       prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
       tileSources: {
         type: 'image',
-        url:  imageUrl
+        url: imageUrl
       }
     });
 
@@ -34,8 +36,6 @@ function App() {
         element: annotation,
         location: viewportPoint
       });
-      
-      console.log('Added annotation at:', viewportPoint);
     });
 
   }, []);
@@ -43,21 +43,28 @@ function App() {
   return (
     <div className="App">
       <h1>Space Viewer</h1>
-      <button onClick={() => setShow3D(!show3D)}>
+      <button onClick={() => { setShow3D(!show3D); setShowMoon(false); }}>
         {show3D ? 'Show 2D View' : 'Show 3D View'}
       </button>
+      <button onClick={() => { setShowMoon(!showMoon); setShow3D(false); }}>
+        {showMoon ? 'Hide Moon' : 'Show Moon Terrain'}
+      </button>
       
-      {!show3D ? (
+      {!show3D && !showMoon && (
         <div>
           <h2>2D View - Click to Add Annotations</h2>
           <div id="openseadragon-viewer" style={{ width: '100%', height: '600px', border: '1px solid black' }}></div>
         </div>
-      ) : (
+      )}
+      
+      {show3D && !showMoon && (
         <div>
           <h2>3D View</h2>
           <ThreeScene imageUrl={imageUrl}/>
         </div>
       )}
+      
+      {showMoon && <MoonTerrain />}
     </div>
   );
 }
