@@ -13,8 +13,8 @@ function MoonPlane({ heightScale }) {
     const colorLoader = new THREE.TextureLoader();
     const heightLoader = new THREE.TextureLoader();
     
-    colorLoader.load('/moon_data/moon_color.png', setColorTexture);
-    heightLoader.load('/moon_data/moon_height.png', setHeightTexture);
+    colorLoader.load('/moon_data/moon_color_16k.png', setColorTexture);
+    heightLoader.load('/moon_data/moon_height_16k.png', setHeightTexture);
   }, []);
   
   const geometry = useMemo(() => {
@@ -31,7 +31,6 @@ function MoonPlane({ heightScale }) {
     
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const positions = geo.attributes.position;
-    
     // elevation logic
     for (let i = 0; i < positions.count; i++) {
       const u = (i % 513) / 512;
@@ -66,7 +65,7 @@ function MoonPlane({ heightScale }) {
     </mesh>
   );
 }
-// first person control logic
+// first person
 function FirstPersonControls({ speed = 20 }) {
   const { camera } = useThree();
   const keysRef = useRef({});
