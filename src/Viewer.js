@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import OpenSeadragon from "openseadragon";
 import ThreeScene from "./ThreeScene";
+import CollaborativeThreeScene from "./CollaborativeThreeScene";
 import { useCollaborationStore } from "./hooks/useCollaborationStore";
 import UserCursor from "./components/UserCursor";
 import AnnotationMarker from "./components/AnnotationMarker";
@@ -70,6 +71,7 @@ const Viewer = () => {
     removeAnnotation,
     removeOverlay,
     updatePosition,
+    updatePosition3D,
     updateAnnotationPosition,
     updateOverlayPosition,
     updateOverlaySize
@@ -559,8 +561,36 @@ const Viewer = () => {
         </div>
       ) : (
         <div>
-          <h2>3D View</h2>
-          <ThreeScene imageUrl="/space1/space1_files/0/0_0.jpg" />
+          <h2>3D Collaborative View</h2>
+          {isJoined ? (
+            <CollaborativeThreeScene 
+              collaborationData={{
+                connected,
+                mockMode,
+                currentUser,
+                activeUsers,
+                annotations,
+                userPositions,
+                updatePosition3D,
+                addAnnotation,
+                removeAnnotation
+              }}
+            />
+          ) : (
+            <div style={{ 
+              padding: '40px', 
+              textAlign: 'center',
+              background: 'rgba(255, 255, 255, 0.1)',
+              margin: '20px',
+              borderRadius: '12px',
+              border: '2px dashed #666'
+            }}>
+              <h3>Join a room to enable 3D collaboration</h3>
+              <p style={{ color: '#666' }}>
+                Connect to see other users, their positions, and shared annotations in the 3D space
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

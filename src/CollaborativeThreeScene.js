@@ -1,0 +1,590 @@
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { PointerLockControls, Html } from '@react-three/drei';
+import * as THREE from 'three';
+import AnnotationMarker3D from './components/AnnotationMarker3D';
+import UserAvatar3D from './components/UserAvatar3D';
+import { useCollaborationStore } from './hooks/useCollaborationStore';
+
+/**
+ * Moon Plane with height map
+ */
+function MoonPlane({ heightScale }) {
+  const meshRef = useRef();
+  const [colorTexture, setColorTexture] = useState(null);
+  const [heightTexture, setHeightTexture] = useState(null);
+  
+  useEffect(() => {
+    const colorLoader = new THREE.TextureLoader();
+    const heightLoader = new THREE.TextureLoader();
+    
+    colorLoader.load('/moon_data/moon_color.png', setColorTexture);
+    heightLoader.load('/moon_data/moon_height.png', setHeightTexture);
+  }, []);
+  
+  const geometry = React.useMemo(() => {
+    if (!heightTexture?.image) return new THREE.PlaneGeometry(100, 100, 512, 512);
+    
+    const geo = new THREE.PlaneGeometry(100, 100, 512, 512);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = heightTexture.image;
+    
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const positions = geo.attributes.position;
+    
+    for (let i = 0; i < positions.count; i++) {
+      const u = (i % 513) / 512;
+      const v = Math.floor(i / 513) / 512;
+      
+      const x = Math.floor(u * (canvas.width - 1));
+      const y = Math.floor(v * (canvas.height - 1));
+      const index = (y * canvas.width + x) * 4;
+      
+      const height = (imageData.data[index] * 256 + imageData.data[index + 1]) / 65535;
+      positions.setZ(i, (height - 0.5) * heightScale * 20);
+    }
+    
+    geo.computeVertexNormals();
+    return geo;
+  }, [heightTexture, heightScale]);
+  
+  if (!colorTexture || !heightTexture) return null;
+  
+  return (
+    <mesh 
+      ref={meshRef} 
+      geometry={geometry}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, 0, 0]}
+    >
+      <meshStandardMaterial 
+        map={colorTexture}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+/**
+ * First Person Controls with position broadcasting
+ */
+function CollaborativeFirstPersonControls({ 
+  speed = 20, 
+  updatePosition3D, 
+  isJoined 
+}) {
+  const { camera } = useThree();
+  const keysRef = useRef({});
+  const lastUpdateTime = useRef(0);
+  
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      keysRef.current[e.code] = true;
+    };
+    const handleKeyUp = (e) => {
+      keysRef.current[e.code] = false;
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+  
+  useFrame((state, delta) => {
+    const keys = keysRef.current;
+    const moveSpeed = speed * delta;
+    
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    const right = new THREE.Vector3();
+    right.crossVectors(forward, camera.up).normalize();
+    
+    const movement = new THREE.Vector3();
+    
+    if (keys['KeyW']) movement.add(forward);
+    if (keys['KeyS']) movement.sub(forward);
+    if (keys['KeyD']) movement.add(right);
+    if (keys['KeyA']) movement.sub(right);
+    if (keys['Space']) movement.y += 1;
+    if (keys['ShiftLeft']) movement.y -= 1;
+    
+    if (movement.length() > 0) {
+      movement.normalize().multiplyScalar(moveSpeed);
+      camera.position.add(movement);
+    }
+    
+    // Broadcast position to other users (throttled to 10 times per second)
+    if (isJoined && state.clock.elapsedTime - lastUpdateTime.current > 0.1) {
+      lastUpdateTime.current = state.clock.elapsedTime;
+      
+      // Calculate pitch and yaw from camera rotation
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      
+      const pitch = Math.asin(direction.y);
+      const yaw = Math.atan2(direction.x, direction.z);
+      
+      updatePosition3D(
+        camera.position.x,
+        camera.position.y,
+        camera.position.z,
+        pitch,
+        yaw
+      );
+    }
+  });
+  
+  return <PointerLockControls />;
+}
+
+/**
+ * Annotation placement system with raycasting
+ */
+function AnnotationPlacer({ 
+  isJoined, 
+  onPlaceAnnotation,
+  terrainRef 
+}) {
+  const { camera, raycaster, scene, gl } = useThree();
+  const [inputVisible, setInputVisible] = useState(false);
+  const [inputPosition, setInputPosition] = useState({ x: 0, y: 0, z: 0 });
+  const [inputText, setInputText] = useState('');
+  const [screenPosition, setScreenPosition] = useState({ x: 0, y: 0 });
+  
+  useEffect(() => {
+    if (!isJoined) {
+      console.log('⚠️ Not joined, annotation placer disabled');
+      return;
+    }
+    
+    const handleKeyDown = (event) => {
+      // Press E to place annotation
+      if (event.key !== 'e' && event.key !== 'E' && event.code !== 'KeyE') {
+        return;
+      }
+      
+      console.log('🎯 E key pressed, attempting to place annotation');
+      
+      // Don't place annotation if input is already visible
+      if (inputVisible) {
+        console.log('⚠️ Input already visible, ignoring');
+        return;
+      }
+      
+      // Always use center of screen for first-person mode
+      const x = 0;
+      const y = 0;
+      
+      console.log('🔍 Raycasting from center of screen...');
+      
+      // Raycast from center of screen to find intersection with terrain
+      raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
+      
+      console.log(`Found ${intersects.length} intersections`);
+      
+      if (intersects.length > 0) {
+        const point = intersects[0].point;
+        console.log('✅ Placing annotation at:', point);
+        setInputPosition({ x: point.x, y: point.y, z: point.z });
+        setInputVisible(true);
+      } else {
+        console.log('❌ No terrain found at crosshair - make sure you are looking at the terrain');
+      }
+    };
+    
+    console.log('✅ Annotation placer initialized');
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      console.log('🧹 Annotation placer cleanup');
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isJoined, camera, raycaster, scene, gl, inputVisible]);
+  
+  const handleSave = () => {
+    if (inputText.trim()) {
+      onPlaceAnnotation(inputText, inputPosition.x, inputPosition.y, inputPosition.z);
+      setInputText('');
+      setInputVisible(false);
+    }
+  };
+  
+  const handleCancel = () => {
+    setInputText('');
+    setInputVisible(false);
+  };
+  
+  if (!inputVisible) return null;
+  
+  return (
+    <Html
+      position={[inputPosition.x, inputPosition.y + 1, inputPosition.z]}
+      center
+      distanceFactor={8}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div
+        style={{
+          background: 'rgba(0, 0, 0, 0.95)',
+          padding: '15px',
+          borderRadius: '8px',
+          border: '2px solid #4CAF50',
+          minWidth: '250px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.7)'
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Enter annotation text..."
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleSave();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              handleCancel();
+            }
+          }}
+          autoFocus
+          style={{
+            width: '100%',
+            padding: '8px',
+            fontSize: '14px',
+            border: '1px solid #666',
+            borderRadius: '4px',
+            background: '#222',
+            color: 'white',
+            outline: 'none'
+          }}
+        />
+        <div style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          marginTop: '10px',
+          justifyContent: 'flex-end'
+        }}>
+          <button
+            onClick={handleCancel}
+            style={{
+              padding: '6px 12px',
+              fontSize: '13px',
+              background: '#666',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              padding: '6px 12px',
+              fontSize: '13px',
+              background: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </Html>
+  );
+}
+
+/**
+ * Main Collaborative 3D Scene Component
+ * Props are passed from parent to ensure we use the same collaboration state
+ */
+function CollaborativeThreeScene({ 
+  heightScale = 0.15,
+  collaborationData 
+}) {
+  const [locked, setLocked] = useState(false);
+  const terrainRef = useRef();
+  
+  // Use passed-in collaboration data if available, otherwise fall back to hook
+  const fallbackStore = useCollaborationStore();
+  const {
+    connected,
+    mockMode,
+    currentUser,
+    activeUsers,
+    annotations,
+    userPositions,
+    updatePosition3D,
+    addAnnotation,
+    removeAnnotation
+  } = collaborationData || fallbackStore;
+  
+  const isJoined = (connected || mockMode) && currentUser?.id;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 CollaborativeThreeScene state:', {
+      connected,
+      mockMode,
+      currentUserId: currentUser?.id,
+      currentUserName: currentUser?.name,
+      isJoined,
+      activeUsersCount: activeUsers?.length || 0,
+      annotationsCount: annotations?.length || 0
+    });
+  }, [connected, mockMode, currentUser, isJoined, activeUsers, annotations]);
+  
+  const handlePlaceAnnotation = useCallback((text, x, y, z) => {
+    console.log('📝 handlePlaceAnnotation called:', { text, x, y, z });
+    addAnnotation(text, x, y, z);
+  }, [addAnnotation]);
+  
+  return (
+    <div style={{ width: '100%', height: '100vh' }}>
+      {!locked && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 100,
+          background: 'rgba(0,0,0,0.9)',
+          padding: '30px',
+          borderRadius: '12px',
+          color: 'white',
+          textAlign: 'center',
+          maxWidth: '500px'
+        }}>
+          <h3>🌙 Collaborative Lunar Terrain</h3>
+          <p style={{ marginBottom: '20px' }}>Click anywhere to start exploring</p>
+          
+          <div style={{ 
+            textAlign: 'left', 
+            fontSize: '14px', 
+            marginTop: '20px',
+            background: 'rgba(255,255,255,0.05)',
+            padding: '15px',
+            borderRadius: '8px'
+          }}>
+            <div style={{ marginBottom: '10px' }}>
+              <strong style={{ color: '#4CAF50' }}>Movement:</strong><br/>
+              <strong>WASD</strong> - Move forward/back/left/right<br/>
+              <strong>Mouse</strong> - Look around<br/>
+              <strong>Space/Shift</strong> - Move up/down
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <strong style={{ color: '#2196F3' }}>Annotations:</strong><br/>
+              <strong>E Key</strong> - Place annotation at crosshair<br/>
+              <span style={{ fontSize: '12px', color: '#999' }}>
+                (Aim at terrain and press E to add a note)
+              </span>
+            </div>
+            <div>
+              <strong style={{ color: '#FFA726' }}>Controls:</strong><br/>
+              <strong>ESC</strong> - Exit pointer lock mode
+            </div>
+          </div>
+          
+          {isJoined && (
+            <p style={{ 
+              fontSize: '13px', 
+              marginTop: '15px',
+              color: '#4CAF50',
+              fontWeight: 'bold',
+              background: 'rgba(76, 175, 80, 0.2)',
+              padding: '8px',
+              borderRadius: '6px'
+            }}>
+              ✅ Connected - You can see other users and annotations in real-time!
+            </p>
+          )}
+        </div>
+      )}
+      
+      {/* Crosshair for annotation placement */}
+      {locked && isJoined && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 98,
+          pointerEvents: 'none'
+        }}>
+          <div style={{
+            width: '20px',
+            height: '20px',
+            border: '2px solid rgba(76, 175, 80, 0.8)',
+            borderRadius: '50%',
+            position: 'relative',
+            boxShadow: '0 0 10px rgba(76, 175, 80, 0.5)'
+          }}>
+            <div style={{
+              position: 'absolute',
+              width: '2px',
+              height: '10px',
+              background: 'rgba(76, 175, 80, 0.8)',
+              left: '50%',
+              top: '-12px',
+              transform: 'translateX(-50%)'
+            }}/>
+            <div style={{
+              position: 'absolute',
+              width: '2px',
+              height: '10px',
+              background: 'rgba(76, 175, 80, 0.8)',
+              left: '50%',
+              bottom: '-12px',
+              transform: 'translateX(-50%)'
+            }}/>
+            <div style={{
+              position: 'absolute',
+              width: '10px',
+              height: '2px',
+              background: 'rgba(76, 175, 80, 0.8)',
+              top: '50%',
+              left: '-12px',
+              transform: 'translateY(-50%)'
+            }}/>
+            <div style={{
+              position: 'absolute',
+              width: '10px',
+              height: '2px',
+              background: 'rgba(76, 175, 80, 0.8)',
+              top: '50%',
+              right: '-12px',
+              transform: 'translateY(-50%)'
+            }}/>
+          </div>
+          <div style={{
+            position: 'absolute',
+            top: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.7)',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: '#4CAF50',
+            whiteSpace: 'nowrap',
+            fontWeight: 'bold'
+          }}>
+            Press E to place annotation
+          </div>
+        </div>
+      )}
+      
+      <div style={{
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        zIndex: 99,
+        background: 'rgba(0,0,0,0.85)',
+        padding: '15px',
+        borderRadius: '8px',
+        color: 'white',
+        minWidth: '200px',
+        pointerEvents: locked ? 'none' : 'auto'
+      }}>
+        <h4 style={{ margin: '0 0 10px 0' }}>🌍 Collaboration</h4>
+        {isJoined ? (
+          <div style={{ fontSize: '13px' }}>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>You:</strong> {currentUser.name}
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>Users:</strong> {activeUsers.length}
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>Annotations:</strong> {annotations.length}
+            </div>
+            <div style={{ 
+              fontSize: '11px', 
+              color: mockMode ? '#FFA500' : '#4CAF50',
+              marginTop: '8px'
+            }}>
+              {mockMode ? '🤖 Mock Mode' : '🟢 Connected'}
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: '13px', color: '#ff6b6b' }}>
+            Not connected to collaboration
+          </div>
+        )}
+      </div>
+      
+      <Canvas 
+        camera={{ position: [0, 10, 30], fov: 75 }}
+        onPointerDown={() => setLocked(true)}
+      >
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[50, 50, 30]} intensity={1.2} />
+        <directionalLight position={[-50, 30, -30]} intensity={0.5} />
+        
+        <CollaborativeFirstPersonControls 
+          speed={25} 
+          updatePosition3D={updatePosition3D}
+          isJoined={isJoined}
+        />
+        
+        <React.Suspense fallback={null}>
+          <MoonPlane heightScale={heightScale} ref={terrainRef} />
+        </React.Suspense>
+        
+        {/* Render annotations */}
+        {isJoined && annotations.map((annotation) => (
+          annotation.z !== undefined && (
+            <AnnotationMarker3D
+              key={annotation.id}
+              annotation={annotation}
+              currentUserId={currentUser.id}
+              onRemove={removeAnnotation}
+            />
+          )
+        ))}
+        
+        {/* Render other users */}
+        {isJoined && Array.from(userPositions.entries()).map(([userId, position]) => {
+          if (userId === currentUser.id) return null;
+          if (!position.z) return null; // Only render 3D positions
+          
+          const user = activeUsers.find(u => u.id === userId);
+          return (
+            <UserAvatar3D
+              key={userId}
+              userId={userId}
+              userName={user?.name || 'Unknown'}
+              position={position}
+              rotation={{ pitch: position.pitch || 0, yaw: position.yaw || 0 }}
+            />
+          );
+        })}
+        
+        {/* Annotation placer */}
+        <AnnotationPlacer 
+          isJoined={isJoined}
+          onPlaceAnnotation={handlePlaceAnnotation}
+          terrainRef={terrainRef}
+        />
+        
+        <gridHelper args={[200, 50]} position={[0, -5, 0]} />
+      </Canvas>
+    </div>
+  );
+}
+
+export default CollaborativeThreeScene;

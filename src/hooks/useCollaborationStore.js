@@ -85,6 +85,17 @@ export const useCollaborationStore = () => {
       });
     });
 
+    // Handle 3D position updates
+    newSocket.on('position-update-3d', (data) => {
+      userPositionsRef.current.set(data.userId, {
+        x: data.x,
+        y: data.y,
+        z: data.z,
+        pitch: data.pitch,
+        yaw: data.yaw
+      });
+    });
+
     newSocket.on('existing-annotations', (annotations) => {
       console.log('📝 Received existing annotations:', annotations);
       setAnnotations(annotations);
@@ -200,15 +211,25 @@ export const useCollaborationStore = () => {
     socket?.emit('position-update', { x, y, zoom });
   }, [socket, mockMode]);
 
-  const addAnnotation = useCallback((text, x, y) => {
-    console.log('🎯 addAnnotation called:', { text, x, y, mockMode });
+  // New: Update 3D position with rotation
+  const updatePosition3D = useCallback((x, y, z, pitch, yaw) => {
+    if (mockMode) {
+      console.log('🤖 Mock mode: 3D Position update', { x, y, z, pitch, yaw });
+      return;
+    }
+    socket?.emit('position-update-3d', { x, y, z, pitch, yaw });
+  }, [socket, mockMode]);
+
+  const addAnnotation = useCallback((text, x, y, z = undefined) => {
+    console.log('🎯 addAnnotation called:', { text, x, y, z, mockMode });
     
-    // Create the annotation object (annotations are just point markers, no size)
+    // Create the annotation object (support both 2D and 3D annotations)
     const newAnnotation = {
       id: Date.now(),
       text,
       x,
       y,
+      z, // Optional z coordinate for 3D annotations
       userName: currentUser.name,
       userId: currentUser.id,
       user_name: currentUser.name,
@@ -235,7 +256,8 @@ export const useCollaborationStore = () => {
       userName: currentUser.name,
       text,
       x,
-      y
+      y,
+      z
     });
 
     socket?.emit('add-annotation', {
@@ -244,7 +266,8 @@ export const useCollaborationStore = () => {
       userName: currentUser.name,
       text,
       x,
-      y
+      y,
+      z
     });
   }, [socket, currentRoom, currentUser, mockMode]);
 
@@ -389,6 +412,7 @@ export const useCollaborationStore = () => {
     initSocket,
     joinRoom,
     updatePosition,
+    updatePosition3D,
     addAnnotation,
     removeAnnotation,
     addOverlay,

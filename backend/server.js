@@ -62,8 +62,8 @@ function initializeDatabase() {
     // Create rooms table
     db.run('CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_activity DATETIME DEFAULT CURRENT_TIMESTAMP)');
     
-    // Create annotations table (without width/height - annotations are just point markers)
-    db.run('CREATE TABLE IF NOT EXISTS annotations (id INTEGER PRIMARY KEY AUTOINCREMENT, room_id INTEGER NOT NULL, user_id TEXT NOT NULL, user_name TEXT NOT NULL, text TEXT NOT NULL, x REAL NOT NULL, y REAL NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (room_id) REFERENCES rooms(id))');
+    // Create annotations table (with optional z coordinate for 3D annotations)
+    db.run('CREATE TABLE IF NOT EXISTS annotations (id INTEGER PRIMARY KEY AUTOINCREMENT, room_id INTEGER NOT NULL, user_id TEXT NOT NULL, user_name TEXT NOT NULL, text TEXT NOT NULL, x REAL NOT NULL, y REAL NOT NULL, z REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (room_id) REFERENCES rooms(id))');
     
     // Create image overlays table (with width/height - overlays need size)
     db.run('CREATE TABLE IF NOT EXISTS image_overlays (id INTEGER PRIMARY KEY AUTOINCREMENT, room_id INTEGER NOT NULL, user_id TEXT NOT NULL, user_name TEXT NOT NULL, image_path TEXT NOT NULL, original_name TEXT NOT NULL, x REAL NOT NULL, y REAL NOT NULL, width REAL NOT NULL, height REAL NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (room_id) REFERENCES rooms(id))');
@@ -161,13 +161,23 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('position-update-3d', (data) => {
+    if (currentRoom) {
+      socket.to(currentRoom).emit('position-update-3d', { 
+        userId: currentUser.id, 
+        userName: currentUser.name, 
+        ...data 
+      });
+    }
+  });
+
   socket.on('add-annotation', (data) => {
-    const { roomId, userId, userName, text, x, y } = data;
-    console.log(`➕ Adding annotation from ${userName}: "${text}"`);
+    const { roomId, userId, userName, text, x, y, z } = data;
+    console.log(`➕ Adding annotation from ${userName}: "${text}" at (${x}, ${y}, ${z || 'N/A'})`);
     
     db.run(
-      'INSERT INTO annotations (room_id, user_id, user_name, text, x, y) VALUES (?, ?, ?, ?, ?, ?)', 
-      [roomId, userId, userName, text, x, y], 
+      'INSERT INTO annotations (room_id, user_id, user_name, text, x, y, z) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+      [roomId, userId, userName, text, x, y, z || null], 
       function(err) {
         if (err) {
           console.error('❌ Failed to save annotation:', err);
@@ -181,6 +191,7 @@ io.on('connection', (socket) => {
             text, 
             x, 
             y,
+            z: z || null,
             timestamp: new Date().toISOString() 
           };
           console.log(`✅ Annotation saved with ID ${this.lastID}, broadcasting to room ${roomId}`);
