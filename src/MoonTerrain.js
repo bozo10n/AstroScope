@@ -31,6 +31,7 @@ function MoonPlane({ heightScale }) {
     
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const positions = geo.attributes.position;
+    
     // elevation logic
     for (let i = 0; i < positions.count; i++) {
       const u = (i % 513) / 512;
