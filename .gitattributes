@@ -2,3 +2,6 @@
 *.png filter=lfs diff=lfs merge=lfs -text
 public/moon_data/moon_color_16k.png filter=lfs diff=lfs merge=lfs -text
 public/moon_data/moon_height_16k.png filter=lfs diff=lfs merge=lfs -text
+.png filter=lfs diff=lfs merge=lfs -text
+.jpg filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
