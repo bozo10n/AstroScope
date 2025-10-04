@@ -20,7 +20,7 @@ function MoonPlane({ heightScale }) {
   const geometry = useMemo(() => {
     if (!heightTexture?.image) return new THREE.PlaneGeometry(100, 100, 512, 512);
     
-    const geo = new THREE.PlaneGeometry(100, 100, 512, 512);
+    const geo = new THREE.PlaneGeometry(100, 100, 2048, 2048);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = heightTexture.image;
@@ -31,10 +31,13 @@ function MoonPlane({ heightScale }) {
     
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const positions = geo.attributes.position;
+
+    const verticesPerRow = 2049;
+    const segmentsPerRow = 2048;
     // elevation logic
     for (let i = 0; i < positions.count; i++) {
-      const u = (i % 513) / 512;
-      const v = Math.floor(i / 513) / 512;
+      const u = (i % verticesPerRow) / segmentsPerRow;
+      const v = Math.floor(i / verticesPerRow) / segmentsPerRow;
       
       const x = Math.floor(u * (canvas.width - 1));
       const y = Math.floor(v * (canvas.height - 1));
