@@ -6,19 +6,52 @@ import './App.css';
 function App() {
   const viewerRef = useRef(null);
   const [show3D, setShow3D] = useState(false);
-  const imageUrl =  'https://picsum.photos/4000/3000';
+  const imageUrl = '/space1/space1.dzi';
 
   useEffect(() => {
+    console.log('Loading DZI image from:', imageUrl);
+    
+    // Custom tile source configuration to limit zoom l evels
+    const tileSource = {
+      height: 6871,
+      width: 10000,
+      tileSize: 254,
+      tileOverlap: 1,
+      minLevel: 0,
+      maxLevel: 6,  // Explicitly limit to existing levels
+      getTileUrl: function(level, x, y) {
+        return `/space1/space1_files/${level}/${x}_${y}.jpg`;
+      }
+    };
+    
     const viewer = OpenSeadragon({
       id: "openseadragon-viewer",
       prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
-      tileSources: {
-        type: 'image',
-        url:  imageUrl
-      }
+      tileSources: tileSource,
+      debugMode: false,
+      minZoomLevel: 0,
+      defaultZoomLevel: 1,
+      zoomPerScroll: 1.2,
+      animationTime: 0.5,
+      blendTime: 0.1,
+      constrainDuringPan: true,
+      wrapHorizontal: false,
+      wrapVertical: false,
+      immediateRender: false,
+      preserveImageSizeOnResize: true,
+      visibilityRatio: 0.5,
+      springStiffness: 7.0
     });
 
     viewerRef.current = viewer;
+
+    viewer.addHandler('open', function() {
+      console.log('DZI image loaded successfully');
+    });
+
+    viewer.addHandler('open-failed', function(event) {
+      console.error('Failed to load DZI image:', event);
+    });
 
     viewer.addHandler('canvas-click', function(event) {
       if (!event.quick) return;
