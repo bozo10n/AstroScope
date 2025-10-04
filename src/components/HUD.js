@@ -150,7 +150,7 @@ function HUD({
                     ({(annotation.x || 0).toFixed(0)}, {(annotation.y || 0).toFixed(0)}, {(annotation.z || 0).toFixed(0)})
                   </div>
                   
-                  <div className="hud-annotation-actions">
+                  {/* <div className="hud-annotation-actions">
                     <div className="hud-teleport-hint">
                       {uiMode ? 'Click to teleport' : 'Press TAB for UI mode'} →
                     </div>
@@ -172,7 +172,7 @@ function HUD({
                         </button>
                       )}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               );
             })

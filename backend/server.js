@@ -304,7 +304,6 @@ io.on('connection', (socket) => {
         io.to(currentRoom).emit('user-left', { user: currentUser, activeUsers });
         if (roomUsers.size === 0) rooms.delete(currentRoom);
       }
-      socket.emit('user-left', { user: currentUser, activeUsers });
     }
   });
 });
