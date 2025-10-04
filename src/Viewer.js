@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import OpenSeadragon from "openseadragon";
 import ThreeScene from "./ThreeScene";
+import { useParams } from "react-router-dom";
 
 const Viewer = () => {
   const viewerRef = useRef(null);
@@ -9,6 +10,10 @@ const Viewer = () => {
   const [inputPosition, setInputPosition] = useState({ x: 0, y: 0 });
   const [inputText, setInputText] = useState("");
   const imageUrl = "https://picsum.photos/4000/3000";
+
+  // this is passed from the /viewer/(id) param
+  // use this to get image
+  const { id } = useParams(); 
 
   useEffect(() => {
     const viewer = OpenSeadragon({
