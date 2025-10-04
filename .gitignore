@@ -24,7 +24,22 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package.json
-package-lock.json
-/package-lock.json
-/package.json
+
+# Large image assets (keep these out of git - use Git LFS or external hosting)
+/public/moon_data/*.png
+/public/*.tif
+/public/space1/space1_files/
+
+# Backend uploads (user-generated content)
+/backend/uploads/
+
+# Database files (should not be in git)
+/backend/*.db
+/backend/*.sqlite
+/backend/*.sqlite3
+
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
