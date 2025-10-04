@@ -4,6 +4,7 @@ import { PointerLockControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import AnnotationMarker3D from './components/AnnotationMarker3D';
 import UserAvatar3D from './components/UserAvatar3D';
+import HUD from './components/HUD';
 import { useCollaborationStore } from './hooks/useCollaborationStore';
 
 /**
@@ -172,11 +173,20 @@ function CollaborativeFirstPersonControls({
   updatePosition3D, 
   isJoined,
   terrainRef,
-  minHeight = 2.5  // Minimum height above terrain
+  minHeight = 2.5,  // Minimum height above terrain
+  onPositionChange,  // Callback to update position in parent
+  teleportTo  // External teleport trigger
 }) {
   const { camera, scene, raycaster } = useThree();
   const keysRef = useRef({});
   const lastUpdateTime = useRef(0);
+  
+  // Handle teleport
+  useEffect(() => {
+    if (teleportTo && teleportTo.x !== undefined) {
+      camera.position.set(teleportTo.x, teleportTo.y, teleportTo.z);
+    }
+  }, [teleportTo, camera]);
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -257,9 +267,25 @@ function CollaborativeFirstPersonControls({
         yaw
       );
     }
+    
+    // Update position for HUD
+    if (onPositionChange) {
+      onPositionChange({
+        x: camera.position.x,
+        y: camera.position.y,
+        z: camera.position.z
+      });
+    }
   });
   
-  return <PointerLockControls />;
+  return (
+    <>
+      <PointerLockControls 
+        onLock={() => console.log('Pointer locked')}
+        onUnlock={() => console.log('Pointer unlocked')}
+      />
+    </>
+  );
 }
 
 /**
@@ -426,6 +452,8 @@ function CollaborativeThreeScene({
 }) {
   const [locked, setLocked] = useState(false);
   const terrainRef = useRef();
+  const [currentPosition, setCurrentPosition] = useState({ x: 0, y: 10, z: 30 });
+  const [teleportTo, setTeleportTo] = useState(null);
   
   // Use passed-in collaboration data if available, otherwise fall back to hook
   const fallbackStore = useCollaborationStore();
@@ -461,8 +489,31 @@ function CollaborativeThreeScene({
     addAnnotation(text, x, y, z);
   }, [addAnnotation]);
   
+  const handleTeleport = useCallback((x, y, z) => {
+    console.log('Teleporting to:', { x, y, z });
+    setTeleportTo({ x, y, z });
+    // Reset teleport trigger after a short delay
+    setTimeout(() => setTeleportTo(null), 100);
+  }, []);
+  
+  const handlePositionChange = useCallback((pos) => {
+    setCurrentPosition(pos);
+  }, []);
+  
   return (
-    <div style={{ width: '100%', height: '100vh' }}>
+    <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
+      {/* HUD Component */}
+      {locked && isJoined && (
+        <HUD
+          position={currentPosition}
+          annotations={annotations}
+          activeUsers={activeUsers}
+          onTeleport={handleTeleport}
+          show={locked}
+          currentUserId={currentUser?.id}
+        />
+      )}
+      
       {!locked && (
         <div style={{
           position: 'absolute',
@@ -638,7 +689,14 @@ function CollaborativeThreeScene({
       <Canvas 
         camera={{ position: [0, 10, 30], fov: 75 }}
         onPointerDown={() => setLocked(true)}
-        style={{ background: '#000000' }}
+        style={{ 
+          background: '#000000',
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0
+        }}
       >
         {/* Starry sky background */}
         <StarrySky />
@@ -655,6 +713,8 @@ function CollaborativeThreeScene({
           isJoined={isJoined}
           terrainRef={terrainRef}
           minHeight={2.5}
+          onPositionChange={handlePositionChange}
+          teleportTo={teleportTo}
         />
         
         <React.Suspense fallback={null}>
