@@ -1,0 +1,86 @@
+.annotation-marker {
+  position: absolute;
+  font-size: 2rem;
+  cursor: move;
+  transition: transform 0.3s ease;
+  z-index: 1000;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+  user-select: none;
+  transform: translate(-50%, -50%);
+}
+
+.annotation-marker:hover {
+  transform: translate(-50%, -50%) scale(1.3) !important;
+}
+
+.annotation-marker.preview {
+  opacity: 0.7;
+  transform: translate(-50%, -50%) scale(0.8);
+  animation: pulse 1s ease-in-out infinite;
+  cursor: crosshair;
+}
+
+.annotation-marker.being-dragged {
+  transform: translate(-50%, -50%) scale(1.1) !important;
+  opacity: 0.8;
+  z-index: 1001;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.4) !important;
+}
+
+.annotation-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 1rem;
+  border-radius: 15px;
+  border: 2px solid #007acc;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+  max-width: 200px;
+  margin-bottom: 1rem;
+  z-index: 1002;
+  min-width: 150px;
+}
+
+.annotation-user {
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  color: #007acc;
+  font-size: 0.9rem;
+}
+
+.annotation-text {
+  color: #333;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+}
+
+.annotation-delete-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.25rem;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.2s ease;
+}
+
+.annotation-delete-btn:hover {
+  background: #d32f2f;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 0.7; 
+    transform: translate(-50%, -50%) scale(0.8); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: translate(-50%, -50%) scale(1.0); 
+  }
+}

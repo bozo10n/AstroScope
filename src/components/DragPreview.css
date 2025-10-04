@@ -1,0 +1,19 @@
+.drag-preview {
+  pointer-events: none;
+  opacity: 0.8;
+  font-size: 2rem;
+  animation: wiggle 0.3s ease-in-out;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+}
+
+@keyframes wiggle {
+  0%, 100% { 
+    transform: translate(-50%, -50%) rotate(0deg); 
+  }
+  25% { 
+    transform: translate(-50%, -50%) rotate(-5deg); 
+  }
+  75% { 
+    transform: translate(-50%, -50%) rotate(5deg); 
+  }
+}
