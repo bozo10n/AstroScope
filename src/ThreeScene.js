@@ -8,7 +8,7 @@ function ImagePlane({ imageUrl }) {
   
   return (
     <mesh>
-      <sphereGeometry args={[2, 64, 64]} />  //sphereGeometry
+      <sphereGeometry args={[2, 64, 64]} /> 
       <meshBasicMaterial map={texture} />
     </mesh>
   );
