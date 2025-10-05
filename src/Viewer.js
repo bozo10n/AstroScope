@@ -108,6 +108,13 @@ const Viewer = () => {
 
   // Initialize OpenSeadragon viewer
   useEffect(() => {
+    // Check if the DOM element exists before initializing
+    const element = document.getElementById("openseadragon-viewer");
+    if (!element) {
+      console.warn("OpenSeadragon viewer element not found, skipping initialization");
+      return;
+    }
+
     const viewer = OpenSeadragon({
       id: "openseadragon-viewer",
       prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
@@ -123,8 +130,13 @@ const Viewer = () => {
     viewer.addHandler("canvas-click", handleCanvasClick);
     viewer.addHandler("viewport-change", handleViewportChange);
 
-    return () => viewer.destroy();
-  }, [handleCanvasClick, handleViewportChange]);
+    return () => {
+      if (viewer && !viewer.isDestroyed) {
+        viewer.destroy();
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only initialize once on mount
 
   // Drag move handler
   const handleDragMove = useCallback((event) => {
