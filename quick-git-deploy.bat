@@ -17,8 +17,8 @@ git reset --hard origin/production
 echo Step 3: Pushing to GitHub (force)...
 git push -f origin production
 
-echo Step 4: Pulling on server...
-ssh root@165.22.230.192 "cd /var/www/Space-Viewer && git pull origin production"
+echo Step 4: Pulling on server (force reset)...
+ssh root@165.22.230.192 "cd /var/www/Space-Viewer && git fetch origin production && git reset --hard origin/production"
 
 echo ======================================
 echo Done! Check https://unlrealities.ca
