@@ -12,7 +12,7 @@
 /coverage
 
 # production
-
+# /build  # Commented out - build folder needs to be committed for deployment
 
 # misc
 .DS_Store
@@ -28,7 +28,7 @@ yarn-error.log*
 # Large image assets (keep these out of git - use Git LFS or external hosting)
 /public/moon_data/*.png
 /public/*.tif
-/public/space1/space1_files/
+# /public/space1/space1_files/  # Commented out - tiles need to be committed for deployment
 
 # Backend uploads (user-generated content)
 /backend/uploads/
