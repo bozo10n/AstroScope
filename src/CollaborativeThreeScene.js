@@ -88,7 +88,7 @@ function SunLight() {
 function MoonPlane() {
   const [colorTexture, setColorTexture] = useState(null);
   const [heightTexture, setHeightTexture] = useState(null);
-  const heightScale = 15; // Controls the vertical exaggeration of the terrain
+  const heightScale = 10; // Controls the vertical exaggeration of the terrain
 
   useEffect(() => {
     const loader = new THREE.TextureLoader();
