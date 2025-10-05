@@ -626,11 +626,16 @@ function CollaborativeThreeScene({
   // Handle Tab key to toggle UI mode
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.key === 'Tab' || e.code === 'Tab') && locked) {
+      if (e.key === 'Tab' || e.code === 'Tab') {
+        // Always prevent default Tab behavior to avoid opening browser help
         e.preventDefault();
         e.stopPropagation();
-        console.log('Tab key pressed');
-        toggleUiMode();
+        
+        // Only toggle UI mode when locked (in camera control mode)
+        if (locked) {
+          console.log('Tab key pressed');
+          toggleUiMode();
+        }
       }
     };
     
@@ -638,6 +643,70 @@ function CollaborativeThreeScene({
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [locked, toggleUiMode]);
+  
+  // Handle R key to quickly export PDF report
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.key === 'r' || e.key === 'R' || e.code === 'KeyR') && locked && isJoined) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('R key pressed - exporting PDF report');
+        
+        // Dynamically import and call the export function
+        import('./utils/pdfExport').then(({ exportAnnotationsToPDF }) => {
+          try {
+            const filename = exportAnnotationsToPDF(annotations, currentUser, activeUsers);
+            console.log('✅ PDF exported:', filename);
+            
+            // Show temporary success message
+            const message = document.createElement('div');
+            message.textContent = `✅ Report exported: ${filename}`;
+            message.style.cssText = `
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              background: rgba(76, 175, 80, 0.95);
+              color: white;
+              padding: 20px 30px;
+              border-radius: 10px;
+              font-size: 16px;
+              font-weight: bold;
+              z-index: 10001;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            `;
+            document.body.appendChild(message);
+            setTimeout(() => message.remove(), 3000);
+          } catch (error) {
+            console.error('Error exporting PDF:', error);
+            
+            // Show error message
+            const message = document.createElement('div');
+            message.textContent = '❌ Error exporting report';
+            message.style.cssText = `
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              background: rgba(244, 67, 54, 0.95);
+              color: white;
+              padding: 20px 30px;
+              border-radius: 10px;
+              font-size: 16px;
+              font-weight: bold;
+              z-index: 10001;
+              box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            `;
+            document.body.appendChild(message);
+            setTimeout(() => message.remove(), 3000);
+          }
+        });
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [locked, isJoined, annotations, currentUser, activeUsers]);
   
 
   
@@ -815,11 +884,17 @@ function CollaborativeThreeScene({
               </span>
             </div>
             <div style={{ marginBottom: '10px' }}>
-              <strong style={{ color: '#FFA726' }}>UI Interaction:</strong><br/>
-              <strong>TAB</strong> - Toggle UI mode (click HUD elements)<br/>
-              <strong>Exit Button</strong> - Exit camera control<br/>
+              <strong style={{ color: '#FFA726' }}>Reports:</strong><br/>
+              <strong>R Key</strong> - Instantly export PDF report of all annotations<br/>
               <span style={{ fontSize: '12px', color: '#999' }}>
-                (Use TAB to interact with annotations, export PDFs, etc.)
+                (Quick export without leaving camera control)
+              </span>
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <strong style={{ color: '#9C27B0' }}>UI Interaction:</strong><br/>
+              <strong>TAB</strong> - Toggle UI mode (click HUD elements)<br/>
+              <span style={{ fontSize: '12px', color: '#999' }}>
+                (Use TAB to interact with annotations list)
               </span>
             </div>
             <div>
@@ -914,6 +989,28 @@ function CollaborativeThreeScene({
           }}>
             Press E to place annotation
           </div>
+        </div>
+      )}
+      
+      {/* Quick Report Export Reminder */}
+      {locked && isJoined && annotations.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          bottom: 120,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 98,
+          background: 'rgba(156, 39, 176, 0.9)',
+          color: '#fff',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '13px',
+          fontWeight: 'bold',
+          pointerEvents: 'none',
+          boxShadow: '0 0 20px rgba(156, 39, 176, 0.5)',
+          textShadow: '0 0 5px #000'
+        }}>
+          📄 Press R to export report ({annotations.length} annotation{annotations.length !== 1 ? 's' : ''})
         </div>
       )}
       

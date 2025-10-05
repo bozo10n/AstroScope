@@ -38,8 +38,8 @@ git commit -m "%commit_msg%"
 echo ✓ Committed
 echo.
 
-echo [5/6] Pushing to GitHub...
-git push origin production
+echo [5/6] Pushing to GitHub (force)...
+git push -f origin production
 if %errorlevel% neq 0 (
     echo ERROR: Push failed!
     pause
