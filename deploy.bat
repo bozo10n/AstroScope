@@ -49,7 +49,7 @@ echo ✓ Pushed to GitHub
 echo.
 
 echo [6/6] Deploying to server...
-ssh root@165.22.230.192 "cd /var/www/Space-Viewer && git pull origin production && git lfs pull && rm -rf node_modules package-lock.json && npm install && cd backend && rm -rf node_modules package-lock.json && npm install && pm2 startOrReload ecosystem.config.js --env production && pm2 save"
+ssh root@165.22.230.192 "cd /var/www/Space-Viewer && git pull origin production && git lfs pull && npm ci && cd backend && npm ci && pm2 startOrReload ecosystem.config.js --env production && pm2 save"
 if %errorlevel% neq 0 (
     echo ERROR: Server deployment failed!
     pause
