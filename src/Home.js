@@ -96,6 +96,17 @@ const Home = () => {
 
   return (
     <div className="home-container">
+      <header className="header">
+        <button className="launch-button" onClick={() => navigate("/")}>Home</button>
+        <div className="search-container">
+          <input
+            type="text"
+            className="search-bar"
+           placeholder="Search..."
+          />
+        </div>
+      </header>
+
       <h1 className="pageTitle">AstroScope</h1>
 
       <section className="tiles">

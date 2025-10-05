@@ -9,7 +9,7 @@ import ImageOverlay from "./components/ImageOverlay";
 import ViewerToolbar from "./components/ViewerToolbar";
 import DragPreview from "./components/DragPreview";
 import "./Viewer.css";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
 let shootingStarInterval;
 
@@ -112,6 +112,8 @@ const Viewer = () => {
   // this is passed from the /viewer/(id) param
   // use this to get image
   const { id } = useParams(); 
+
+  const navigate = useNavigate();
 
   // Refs
   const viewerRef = useRef(null);
@@ -496,6 +498,10 @@ const Viewer = () => {
 
   return (
     <div className="App">
+      <header className="header">
+        <button className="launch-button" onClick={() => navigate("/Home")}>Home</button>
+      </header>
+
       <h1 className="sectionHeader ">Space Viewer</h1>
       
       {renderCollaborationPanel()}
