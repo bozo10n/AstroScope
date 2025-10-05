@@ -35,9 +35,10 @@ function HUD({
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   };
 
-  // Get annotations with distance, sorted by proximity
+  // Get 3D annotations only (with z coordinate) with distance, sorted by proximity
   const annotationsWithDistance = annotations
-    .filter(a => a.x !== undefined && a.x !== null && a.z !== undefined && a.z !== null)
+    .filter(a => a.z !== undefined && a.z !== null) // Only 3D annotations
+    .filter(a => a.x !== undefined && a.x !== null) // Ensure valid coordinates
     .map(annotation => ({
       ...annotation,
       distance: calculateDistance(annotation)

@@ -295,6 +295,8 @@ function CollaborativeFirstPersonControls({
     }
   });
   
+
+  
   // Don't render PointerLockControls in UI mode
   if (uiMode) {
     return null;
@@ -569,6 +571,8 @@ function CollaborativeThreeScene({
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [locked, toggleUiMode]);
   
+
+  
   return (
     <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
       {/* HUD Component - show when locked or in UI mode */}
@@ -825,17 +829,17 @@ function CollaborativeThreeScene({
           <MoonPlane heightScale={heightScale} ref={terrainRef} />
         </React.Suspense>
         
-        {/* Render annotations */}
-        {isJoined && annotations.map((annotation) => (
-          annotation.z !== undefined && (
+        {/* Render annotations - only 3D annotations (with z coordinate) */}
+        {isJoined && annotations
+          .filter(annotation => annotation.z !== undefined && annotation.z !== null)
+          .map((annotation) => (
             <AnnotationMarker3D
               key={annotation.id}
               annotation={annotation}
               currentUserId={currentUser.id}
               onRemove={removeAnnotation}
             />
-          )
-        ))}
+          ))}
         
         {/* Render other users */}
         {isJoined && Array.from(userPositions.entries()).map(([userId, position]) => {
