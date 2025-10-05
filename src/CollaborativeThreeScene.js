@@ -193,10 +193,14 @@ function CollaborativeFirstPersonControls({
     }
   }, [uiMode]);
   
-  // Handle teleport
+  // Handle teleport with smooth transition
+  const teleportStartRef = useRef(null);
+  const teleportFromRef = useRef(null);
+  
   useEffect(() => {
     if (teleportTo && teleportTo.x !== undefined) {
-      camera.position.set(teleportTo.x, teleportTo.y, teleportTo.z);
+      teleportFromRef.current = camera.position.clone();
+      teleportStartRef.current = Date.now();
     }
   }, [teleportTo, camera]);
   
@@ -218,6 +222,31 @@ function CollaborativeFirstPersonControls({
   }, []);
   
   useFrame((state, delta) => {
+    // Handle smooth teleport animation
+    if (teleportTo && teleportStartRef.current && teleportFromRef.current) {
+      const elapsed = Date.now() - teleportStartRef.current;
+      const duration = 500; // 500ms transition
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out cubic for smooth deceleration
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      
+      camera.position.lerpVectors(
+        teleportFromRef.current,
+        new THREE.Vector3(teleportTo.x, teleportTo.y, teleportTo.z),
+        easeProgress
+      );
+      
+      // Reset teleport after animation completes
+      if (progress >= 1) {
+        teleportStartRef.current = null;
+        teleportFromRef.current = null;
+      }
+      
+      // Skip normal movement during teleport
+      return;
+    }
+    
     const keys = keysRef.current;
     const moveSpeed = speed * delta;
     
@@ -318,26 +347,14 @@ function CollaborativeFirstPersonControls({
 }
 
 /**
- * Annotation placement system with raycasting
+ * Annotation placement system with raycasting (inside Canvas)
  */
-function AnnotationPlacer({ 
+const AnnotationPlacer = React.memo(({ 
   isJoined, 
-  onPlaceAnnotation,
-  terrainRef,
-  onAnnotatingChange
-}) {
-  const { camera, raycaster, scene, gl } = useThree();
-  const [inputVisible, setInputVisible] = useState(false);
-  const [inputPosition, setInputPosition] = useState({ x: 0, y: 0, z: 0 });
-  const [inputText, setInputText] = useState('');
-  const [screenPosition, setScreenPosition] = useState({ x: 0, y: 0 });
-  
-  // Notify parent when annotation input is visible
-  useEffect(() => {
-    if (onAnnotatingChange) {
-      onAnnotatingChange(inputVisible);
-    }
-  }, [inputVisible, onAnnotatingChange]);
+  onShowInput,
+  terrainRef
+}) => {
+  const { camera, raycaster, scene } = useThree();
   
   useEffect(() => {
     if (!isJoined) {
@@ -350,16 +367,9 @@ function AnnotationPlacer({
         return;
       }
       
-      
-      // Don't place annotation if input is already visible
-      if (inputVisible) {
-        return;
-      }
-      
       // Always use center of screen for first-person mode
       const x = 0;
       const y = 0;
-      
       
       // Raycast from center of screen to find intersection with terrain
       raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
@@ -369,9 +379,7 @@ function AnnotationPlacer({
       
       if (intersects.length > 0) {
         const point = intersects[0].point;
-        setInputPosition({ x: point.x, y: point.y, z: point.z });
-        setInputVisible(true);
-      } else {
+        onShowInput({ x: point.x, y: point.y, z: point.z });
       }
     };
     
@@ -379,105 +387,10 @@ function AnnotationPlacer({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isJoined, camera, raycaster, scene, gl, inputVisible]);
+  }, [isJoined, camera, raycaster, scene, onShowInput]);
   
-  const handleSave = () => {
-    if (inputText.trim()) {
-      onPlaceAnnotation(inputText, inputPosition.x, inputPosition.y, inputPosition.z);
-      setInputText('');
-      setInputVisible(false);
-    }
-  };
-  
-  const handleCancel = () => {
-    setInputText('');
-    setInputVisible(false);
-  };
-  
-  if (!inputVisible) return null;
-  
-  return (
-    <Html
-      position={[inputPosition.x, inputPosition.y + 1, inputPosition.z]}
-      center
-      distanceFactor={8}
-      style={{ pointerEvents: 'auto' }}
-    >
-      <div
-        style={{
-          background: 'rgba(0, 0, 0, 0.95)',
-          padding: '15px',
-          borderRadius: '8px',
-          border: '2px solid #4CAF50',
-          minWidth: '250px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.7)'
-        }}
-      >
-        <input
-          type="text"
-          placeholder="Enter annotation text..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleSave();
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              handleCancel();
-            }
-          }}
-          autoFocus
-          style={{
-            width: '100%',
-            padding: '8px',
-            fontSize: '14px',
-            border: '1px solid #666',
-            borderRadius: '4px',
-            background: '#222',
-            color: 'white',
-            outline: 'none'
-          }}
-        />
-        <div style={{ 
-          display: 'flex', 
-          gap: '8px', 
-          marginTop: '10px',
-          justifyContent: 'flex-end'
-        }}>
-          <button
-            onClick={handleCancel}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              background: '#666',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              background: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    </Html>
-  );
-}
+  return null;
+});
 
 /**
  * Main Collaborative 3D Scene Component
@@ -493,6 +406,11 @@ function CollaborativeThreeScene({
   const [currentPosition, setCurrentPosition] = useState({ x: 0, y: 10, z: 30 });
   const [teleportTo, setTeleportTo] = useState(null);
   const [isAnnotating, setIsAnnotating] = useState(false);
+  
+  // Annotation input state (outside Canvas)
+  const [annotationInputVisible, setAnnotationInputVisible] = useState(false);
+  const [annotationInputPosition, setAnnotationInputPosition] = useState({ x: 0, y: 0, z: 0 });
+  const [annotationInputText, setAnnotationInputText] = useState('');
   
   // Use passed-in collaboration data if available, otherwise fall back to hook
   const fallbackStore = useCollaborationStore();
@@ -510,29 +428,70 @@ function CollaborativeThreeScene({
   
   const isJoined = (connected || mockMode) && currentUser?.id;
   
+  // Force re-render when user positions change by tracking in state
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isJoined && userPositions.size > 0) {
+        forceUpdate({}); // Trigger re-render to show user positions
+      }
+    }, 100); // Update 10 times per second
+    return () => clearInterval(interval);
+  }, [isJoined, userPositions]);
+  
   // Debug logging
   useEffect(() => {
-    console.log(' CollaborativeThreeScene state:', {
+    console.log('🎮 CollaborativeThreeScene state:', {
       connected,
       mockMode,
       currentUserId: currentUser?.id,
       currentUserName: currentUser?.name,
       isJoined,
       activeUsersCount: activeUsers?.length || 0,
-      annotationsCount: annotations?.length || 0
+      annotationsCount: annotations?.length || 0,
+      userPositionsCount: userPositions?.size || 0
     });
-  }, [connected, mockMode, currentUser, isJoined, activeUsers, annotations]);
+  }, [connected, mockMode, currentUser, isJoined, activeUsers, annotations, userPositions]);
   
   const handlePlaceAnnotation = useCallback((text, x, y, z) => {
     console.log('handlePlaceAnnotation called:', { text, x, y, z });
     addAnnotation(text, x, y, z);
   }, [addAnnotation]);
   
+  const handleShowAnnotationInput = useCallback((position) => {
+    setAnnotationInputPosition(position);
+    setAnnotationInputVisible(true);
+    setIsAnnotating(true);
+    setUiMode(true); // Enter UI mode
+  }, []);
+  
+  const handleSaveAnnotation = useCallback(() => {
+    if (annotationInputText.trim()) {
+      handlePlaceAnnotation(
+        annotationInputText,
+        annotationInputPosition.x,
+        annotationInputPosition.y,
+        annotationInputPosition.z
+      );
+      setAnnotationInputText('');
+      setAnnotationInputVisible(false);
+      setIsAnnotating(false);
+      setUiMode(false); // Exit UI mode
+    }
+  }, [annotationInputText, annotationInputPosition, handlePlaceAnnotation]);
+  
+  const handleCancelAnnotation = useCallback(() => {
+    setAnnotationInputText('');
+    setAnnotationInputVisible(false);
+    setIsAnnotating(false);
+    setUiMode(false); // Exit UI mode
+  }, []);
+  
   const handleTeleport = useCallback((x, y, z) => {
     console.log('Teleporting to:', { x, y, z });
     setTeleportTo({ x, y, z });
-    // Reset teleport trigger after a short delay
-    setTimeout(() => setTeleportTo(null), 100);
+    // Reset teleport trigger after animation completes (600ms to be safe)
+    setTimeout(() => setTeleportTo(null), 600);
   }, []);
   
   const handlePositionChange = useCallback((pos) => {
@@ -575,6 +534,95 @@ function CollaborativeThreeScene({
   
   return (
     <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
+      {/* Annotation Input Overlay - Outside Canvas for performance */}
+      {annotationInputVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(0, 0, 0, 0.95)',
+            padding: '15px',
+            borderRadius: '8px',
+            border: '2px solid #4CAF50',
+            minWidth: '250px',
+            maxWidth: '400px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.7)',
+            zIndex: 10000
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="text"
+            placeholder="Enter annotation text..."
+            value={annotationInputText}
+            onChange={(e) => {
+              e.stopPropagation();
+              setAnnotationInputText(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveAnnotation();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                handleCancelAnnotation();
+              }
+            }}
+            onKeyUp={(e) => e.stopPropagation()}
+            onKeyPress={(e) => e.stopPropagation()}
+            autoFocus
+            style={{
+              width: '100%',
+              padding: '8px',
+              fontSize: '14px',
+              border: '1px solid #666',
+              borderRadius: '4px',
+              background: '#222',
+              color: 'white',
+              outline: 'none'
+            }}
+          />
+          <div style={{ 
+            display: 'flex', 
+            gap: '8px', 
+            marginTop: '10px',
+            justifyContent: 'flex-end'
+          }}>
+            <button
+              onClick={handleCancelAnnotation}
+              style={{
+                padding: '6px 12px',
+                fontSize: '13px',
+                background: '#666',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveAnnotation}
+              style={{
+                padding: '6px 12px',
+                fontSize: '13px',
+                background: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* HUD Component - show when locked or in UI mode */}
       {(locked || uiMode) && isJoined && (
         <HUD
@@ -844,28 +892,39 @@ function CollaborativeThreeScene({
           ))}
         
         {/* Render other users */}
-        {isJoined && Array.from(userPositions.entries()).map(([userId, position]) => {
-          if (userId === currentUser.id) return null;
-          if (!position.z) return null; // Only render 3D positions
+        {isJoined && (() => {
+          const positions = Array.from(userPositions.entries());
+          console.log('👥 Rendering users. Total positions:', positions.length, 'Current user:', currentUser?.id);
           
-          const user = activeUsers.find(u => u.id === userId);
-          return (
-            <UserAvatar3D
-              key={userId}
-              userId={userId}
-              userName={user?.name || 'Unknown'}
-              position={position}
-              rotation={{ pitch: position.pitch || 0, yaw: position.yaw || 0 }}
-            />
-          );
-        })}
+          return positions.map(([userId, position]) => {
+            console.log('  - User:', userId, 'Position:', position, 'Is current?', userId === currentUser.id);
+            
+            if (userId === currentUser.id) return null;
+            if (!position.z && position.z !== 0) {
+              console.log('  ⚠️ Skipping user (no Z coordinate):', userId);
+              return null; // Only render 3D positions
+            }
+            
+            const user = activeUsers.find(u => u.id === userId);
+            console.log('  ✅ Rendering user avatar:', userId, user?.name || 'Unknown');
+            
+            return (
+              <UserAvatar3D
+                key={userId}
+                userId={userId}
+                userName={user?.name || 'Unknown'}
+                position={position}
+                rotation={{ pitch: position.pitch || 0, yaw: position.yaw || 0 }}
+              />
+            );
+          });
+        })()}
         
         {/* Annotation placer */}
         <AnnotationPlacer 
           isJoined={isJoined}
-          onPlaceAnnotation={handlePlaceAnnotation}
+          onShowInput={handleShowAnnotationInput}
           terrainRef={terrainRef}
-          onAnnotatingChange={setIsAnnotating}
         />
       </Canvas>
       

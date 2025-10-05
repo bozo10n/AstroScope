@@ -1,7 +1,69 @@
-import React, { useRef } from 'react';
-import { Html } from '@react-three/drei';
+import React, { useRef, useState, useEffect } from 'react';
+import { Html, useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+
+/**
+ * Spaceman Model Component with GLB loading
+ */
+function SpacemanModelWithGLTF({ color, scale = 1 }) {
+  const gltf = useGLTF('/models/spaceman.glb');
+  
+  if (gltf && gltf.scene) {
+    return (
+      <primitive 
+        object={gltf.scene.clone()} 
+        scale={scale}
+        rotation={[0, Math.PI, 0]}
+      />
+    );
+  }
+  
+  return null;
+}
+
+/**
+ * Spaceman Model Component with fallback
+ * Loads the GLB spaceman model with fallback to simple geometry
+ */
+function SpacemanModel({ color, scale = 1 }) {
+  const [useFallback, setUseFallback] = useState(false);
+  
+  // Fallback: Simple geometric spaceman
+  const FallbackModel = () => (
+    <group scale={scale}>
+      {/* Body - cylinder */}
+      <mesh position={[0, 0, 0]}>
+        <cylinderGeometry args={[0.25, 0.3, 1.5, 8]} />
+        <meshStandardMaterial 
+          color={color}
+          emissive={color}
+          emissiveIntensity={0.3}
+        />
+      </mesh>
+      
+      {/* Head - sphere */}
+      <mesh position={[0, 1, 0]}>
+        <sphereGeometry args={[0.35, 16, 16]} />
+        <meshStandardMaterial 
+          color={color}
+          emissive={color}
+          emissiveIntensity={0.4}
+        />
+      </mesh>
+    </group>
+  );
+  
+  if (useFallback) {
+    return <FallbackModel />;
+  }
+  
+  return (
+    <React.Suspense fallback={<FallbackModel />}>
+      <SpacemanModelWithGLTF color={color} scale={scale} />
+    </React.Suspense>
+  );
+}
 
 /**
  * 3D User Avatar component
@@ -36,25 +98,10 @@ function UserAvatar3D({ userId, userName, position, rotation }) {
   
   return (
     <group ref={groupRef} position={[pos.x, pos.y, pos.z]}>
-      {/* Body - cylinder */}
-      <mesh position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.25, 0.3, 1.5, 8]} />
-        <meshStandardMaterial 
-          color={avatarColor}
-          emissive={avatarColor}
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-      
-      {/* Head - sphere */}
-      <mesh position={[0, 1, 0]}>
-        <sphereGeometry args={[0.35, 16, 16]} />
-        <meshStandardMaterial 
-          color={avatarColor}
-          emissive={avatarColor}
-          emissiveIntensity={0.4}
-        />
-      </mesh>
+      {/* Spaceman 3D Model */}
+      <group rotation={[0, rot.yaw, 0]}>
+        <SpacemanModel color={avatarColor} scale={0.8} />
+      </group>
       
       {/* Direction indicator - cone showing where they're looking */}
       <mesh 
