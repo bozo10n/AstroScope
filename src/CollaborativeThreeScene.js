@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { VRButton, XR, useXR, createXRStore } from '@react-three/xr';
 import { Html, Text } from '@react-three/drei';
@@ -83,46 +83,73 @@ function SunLight() {
 }
 
 /**
- * Simplified Moon Plane (procedural terrain for demo)
+ * Moon Terrain Plane using 16-bit height map, adapted from PC version
  */
-function MoonPlane({ heightScale = 0.15 }) {
-  const meshRef = useRef();
-  
-  const geometry = React.useMemo(() => {
-    const geo = new THREE.PlaneGeometry(100, 100, 256, 256);
+function MoonPlane() {
+  const [colorTexture, setColorTexture] = useState(null);
+  const [heightTexture, setHeightTexture] = useState(null);
+  const heightScale = 15; // Controls the vertical exaggeration of the terrain
+
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    loader.load('/moon_data/moon_color.png', setColorTexture);
+    loader.load('/moon_data/moon_height.png', setHeightTexture);
+  }, []);
+
+  const geometry = useMemo(() => {
+    if (!heightTexture?.image) return null;
+
+    const geo = new THREE.PlaneGeometry(100, 100, 512, 512);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = heightTexture.image;
+    
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const positions = geo.attributes.position;
     
-    // Create procedural crater-like terrain
     for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const z = positions.getY(i);
+      // Map vertex position to UV coordinates
+      const u = (positions.getX(i) / 100) + 0.5;
+      const v = (positions.getY(i) / 100) + 0.5;
+
+      const x = Math.floor(u * (canvas.width - 1));
+      const y = Math.floor((1 - v) * (canvas.height - 1)); // Invert V for image coordinates
+      const index = (y * canvas.width + x) * 4;
       
-      // Multiple sine waves for varied terrain
-      let height = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2;
-      height += Math.sin(x * 0.05 + z * 0.05) * 3;
-      height += Math.sin(x * 0.02) * Math.sin(z * 0.02) * 5;
+      // Read 16-bit height data from R and G channels
+      const height = (imageData.data[index] * 256 + imageData.data[index + 1]) / 65535;
       
-      // Add some noise
-      height += (Math.random() - 0.5) * 0.5;
-      
-      positions.setZ(i, height * heightScale);
+      // Displace vertex along its Z-axis (which becomes Y after rotation)
+      positions.setZ(i, (height - 0.5) * heightScale);
     }
     
     geo.computeVertexNormals();
     return geo;
-  }, [heightScale]);
-  
+  }, [heightTexture]);
+
+  if (!geometry || !colorTexture) {
+    // Return a placeholder while loading to prevent raycaster from failing
+    return (
+        <mesh name="moon_terrain" rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[100, 100, 1, 1]} />
+            <meshBasicMaterial color="grey" side={THREE.DoubleSide} />
+        </mesh>
+    );
+  }
+
   return (
     <mesh 
-      ref={meshRef} 
+      name="moon_terrain"
       geometry={geometry}
       rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, 0, 0]}
+      receiveShadow
     >
       <meshStandardMaterial 
-        color="#8B7D6B"
-        roughness={0.9}
-        metalness={0.1}
+        map={colorTexture}
         side={THREE.DoubleSide}
       />
     </mesh>
@@ -133,46 +160,55 @@ function MoonPlane({ heightScale = 0.15 }) {
  * VR Movement System
  */
 function VRMovement({ speed = 5 }) {
-  const { camera } = useThree();
+  const { camera, scene } = useThree();
   const { isPresenting, controllers } = useXR();
-  
+  const raycaster = useRef(new THREE.Raycaster()).current;
+  const playerVelocity = useRef(new THREE.Vector3()).current;
+
   useFrame((state, delta) => {
     if (!isPresenting || controllers.length === 0) return;
-    
-    // Use thumbstick from right controller for movement
+
     const rightController = controllers.find(c => c.inputSource.handedness === 'right');
     if (!rightController?.inputSource.gamepad) return;
-    
+
     const gamepad = rightController.inputSource.gamepad;
     const axes = gamepad.axes;
-    
+    const move = new THREE.Vector3();
+
     if (axes.length >= 4) {
-      // Axes 2 & 3 are typically the right thumbstick
       const moveX = axes[2];
       const moveZ = axes[3];
-      
+
       if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(camera.quaternion);
-        forward.y = 0;
-        forward.normalize();
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).setY(0).normalize();
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize();
         
-        const right = new THREE.Vector3(1, 0, 0);
-        right.applyQuaternion(camera.quaternion);
-        right.y = 0;
-        right.normalize();
+        move.addScaledVector(forward, -moveZ).addScaledVector(right, moveX);
+      }
+    }
+    
+    // Apply movement
+    const damping = 0.9;
+    playerVelocity.add(move.multiplyScalar(speed * delta));
+    playerVelocity.multiplyScalar(damping);
+    camera.position.add(playerVelocity);
+
+    // Terrain following
+    const terrain = scene.getObjectByName("moon_terrain");
+    if (terrain) {
+      raycaster.set(camera.position, new THREE.Vector3(0, -1, 0));
+      const intersects = raycaster.intersectObject(terrain);
+
+      if (intersects.length > 0) {
+        const intersectionPoint = intersects[0].point;
+        const desiredHeight = intersectionPoint.y + 1.6; // Player eye height
         
-        camera.position.addScaledVector(forward, -moveZ * speed * delta);
-        camera.position.addScaledVector(right, moveX * speed * delta);
-        
-        // Keep above terrain
-        if (camera.position.y < 1.6) {
-          camera.position.y = 1.6;
-        }
+        // Smoothly adjust camera height to avoid sudden jumps
+        camera.position.y = THREE.MathUtils.lerp(camera.position.y, desiredHeight, 0.1);
       }
     }
   });
-  
+
   return null;
 }
 
@@ -376,7 +412,7 @@ function VRScene() {
       <SunLight />
       <directionalLight position={[-50, 30, -30]} intensity={0.3} color="#9DB4FF" />
       
-      <MoonPlane heightScale={0.15} />
+      <MoonPlane />
       
       <VRMovement speed={5} />
       
@@ -404,7 +440,7 @@ function VRScene() {
       {/* Info panel (only show in VR) */}
       {isPresenting && <VRInfoPanel />}
       
-      <gridHelper args={[100, 50, '#444444', '#222222']} position={[0, 0, 0]} />
+      <gridHelper args={[100, 50, '#444444', '#222222']} position={[0, -0.01, 0]} />
     </>
   );
 }
@@ -499,7 +535,7 @@ export default function VRLunarDemo() {
       </div>
       
       <Canvas
-        camera={{ position: [0, 1.6, 5], fov: 75 }}
+        camera={{ position: [0, 15, 5], fov: 75 }}
         style={{ 
           background: '#000000',
           width: '100%',
