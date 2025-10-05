@@ -32,7 +32,71 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
+}
+
+.annotationInput {
+  position: absolute;
+  z-index: 99999;
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 8px;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.annotationInput input[type="text"] {
+  width: 260px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  outline: none;
+  font-size: 14px;
+}
+
+.annotationInput .controls {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.annotationInput button {
+  background: #0d6efd;
+  color: white;
+  border: none;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.annotationInput button.secondary {
+  background: #666;
+  margin-right: 8px;
+}
+
+.annotationInput button.destructive {
+  background: #c62828;
+}
+
+.visible-anno-label {
+  background: rgba(0, 0, 0, 0.85);
+  color: #ffeb3b;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.a9s-container {
+  color: #000;
 }
