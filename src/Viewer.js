@@ -50,18 +50,24 @@ const Viewer = () => {
       star.style.left = x + "px";
       star.style.top = y + "px";
       star.style.animationDelay = Math.random() * 5 + "s";
-      document.body.appendChild(star);
+      if (document.body) {
+        document.body.appendChild(star);
+      }
     }
   }
 
   function removeBackgroundStars() {
     const stars = document.querySelectorAll(".backgroundStar");
     stars.forEach((star) => {
-      document.body.removeChild(star);
+      if (star.parentNode) {
+        star.parentNode.removeChild(star);
+      }
     });
   }
 
   function createShootingStar() {
+    if (!document.body) return; // Safety check
+    
     const shootingStar = document.createElement("div");
     shootingStar.classList.add("shootingStar");
 
@@ -102,6 +108,7 @@ const Viewer = () => {
   // this is passed from the /viewer/(id) param
   // use this to get image
   const { id } = useParams(); 
+  const navigate = useNavigate();
   
   // Get viewer configuration based on ID
   const viewerData = viewerConfig.viewers.find(v => v.id === id);
@@ -151,6 +158,9 @@ const Viewer = () => {
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragPreview, setDragPreview] = useState(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
+  
+  // Sidebar state
+  const [showAnnotationSidebar, setShowAnnotationSidebar] = useState(true);
 
   // Collaboration store
   const {
@@ -206,6 +216,18 @@ const Viewer = () => {
       return;
     }
     
+    // Don't initialize if 3D view is active
+    if (show3D) {
+      return;
+    }
+    
+    // Wait for the DOM element to be available
+    const element = document.getElementById("openseadragon-viewer");
+    if (!element) {
+      console.warn("OpenSeadragon container not found in DOM yet");
+      return;
+    }
+    
     const viewer = OpenSeadragon({
       id: "openseadragon-viewer",
       prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
@@ -221,8 +243,13 @@ const Viewer = () => {
     viewer.addHandler("canvas-click", handleCanvasClick);
     viewer.addHandler("viewport-change", handleViewportChange);
 
-    return () => viewer.destroy();
-  }, [id, handleCanvasClick, handleViewportChange]);
+    return () => {
+      if (viewer) {
+        viewer.destroy();
+        viewerRef.current = null;
+      }
+    };
+  }, [id, show3D, handleCanvasClick, handleViewportChange]);
 
   // Drag move handler
   const handleDragMove = useCallback((event) => {
@@ -255,10 +282,18 @@ const Viewer = () => {
     console.log('Resize move:', event.clientX, event.clientY);
   }, [draggedItem]);
 
-  // Mouse event handlers for drag and drop
+  // Apply space theme on mount
   useEffect(() => {
     applySpaceTheme();
+    
+    return () => {
+      stopShootingStars();
+      removeBackgroundStars();
+    };
+  }, []); // Run only once on mount
 
+  // Mouse event handlers for drag and drop
+  useEffect(() => {
     if (!isDragging && !isResizing) return;
 
     const handleMouseMove = (event) => {
@@ -406,6 +441,20 @@ const Viewer = () => {
     setInputText("");
   }, []);
 
+  // Teleport to annotation
+  const handleTeleportToAnnotation = useCallback((annotation) => {
+    const viewer = viewerRef.current;
+    if (!viewer?.viewport) return;
+    
+    try {
+      const point = new OpenSeadragon.Point(annotation.x, annotation.y);
+      viewer.viewport.panTo(point, true); // true for immediate pan
+      viewer.viewport.zoomTo(viewer.viewport.getMaxZoom() * 0.5, point, true);
+    } catch (error) {
+      console.error('Error teleporting to annotation:', error);
+    }
+  }, []);
+
   // Collaboration handlers
   const handleJoinRoom = useCallback(() => {
     if (!userName.trim()) return;
@@ -434,6 +483,34 @@ const Viewer = () => {
       }
     }
   }, [userName, roomId, initSocket, joinRoom]);
+
+  // Handle room-full event
+  useEffect(() => {
+    const handleRoomFull = (event) => {
+      const { fullRoomId, suggestedRoomId, currentCapacity, maxCapacity } = event.detail;
+      
+      // Show alert to user
+      const shouldJoinNext = window.confirm(
+        `Room ${fullRoomId} is full (${currentCapacity}/${maxCapacity} users).\n\n` +
+        `Would you like to join Room ${suggestedRoomId} instead?`
+      );
+      
+      if (shouldJoinNext) {
+        setRoomId(suggestedRoomId);
+        // Automatically try joining the suggested room
+        setTimeout(() => {
+          const socketInstance = initSocket();
+          if (socketInstance?.connected) {
+            joinRoom(suggestedRoomId, userName.trim(), socketInstance);
+            setIsJoined(true);
+          }
+        }, 100);
+      }
+    };
+
+    window.addEventListener('room-full', handleRoomFull);
+    return () => window.removeEventListener('room-full', handleRoomFull);
+  }, [userName, initSocket, joinRoom]);
 
   const handleLeaveRoom = useCallback(() => {
     setIsJoined(false);
@@ -472,6 +549,14 @@ const Viewer = () => {
               Join Room
             </button>
           </div>
+          <div style={{ 
+            marginTop: "8px", 
+            fontSize: "12px", 
+            color: "#888",
+            fontStyle: "italic" 
+          }}>
+            💡 Max 3 users per room. If full, you'll be redirected to the next available room.
+          </div>
         </div>
       ) : (
         <div>
@@ -494,6 +579,27 @@ const Viewer = () => {
             >
               Leave
             </button>
+          </div>
+          <div style={{ 
+            marginTop: "8px", 
+            fontSize: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px"
+          }}>
+            <div>
+              <strong>Room Capacity:</strong> {activeUsers.length}/3 users
+              <span style={{
+                marginLeft: "8px",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                fontSize: "12px",
+                backgroundColor: activeUsers.length >= 8 ? "#ff9800" : activeUsers.length >= 10 ? "#f44336" : "#4CAF50",
+                color: "white"
+              }}>
+                {activeUsers.length >= 3 ? "FULL" : activeUsers.length >= 2 ? "Almost Full" : "Available"}
+              </span>
+            </div>
           </div>
           {activeUsers.length > 1 && (
             <div style={{ marginTop: "8px", fontSize: "14px" }}>
@@ -519,8 +625,42 @@ const Viewer = () => {
   // If viewer not found, show error
   if (!viewerData) {
     return (
-      <div className="App">
-        <h1 className="sectionHeader">Space Viewer</h1>
+      <div className="App" style={{ 
+        minHeight: '100vh',
+        background: 'linear-gradient(to right, #09162a, #0d284d, #113b72, #194f99)',
+        position: 'relative'
+      }}>
+        <header className="header">
+          <button className="launch-button" onClick={() => navigate("/")}>Home</button>
+          <div className="search-container">
+            <input
+              type="text"
+              className="search-bar"
+              placeholder="Search..."
+            />
+          </div>
+        </header>
+
+        <div style={{
+          position: 'relative',
+          zIndex: 1000,
+          paddingTop: '20px',
+          background: 'transparent'
+        }}>
+          <h1 className="sectionHeader" style={{
+            position: 'relative',
+            zIndex: 1001,
+            margin: '20px auto',
+            display: 'block',
+            textAlign: 'center',
+            color: '#b8e4ff',
+            fontSize: '36px',
+            fontWeight: '700'
+          }}>
+            Space Viewer
+          </h1>
+        </div>
+
         <div style={{ 
           textAlign: 'center', 
           padding: '50px',
@@ -529,7 +669,7 @@ const Viewer = () => {
           <h2>Viewer not found</h2>
           <p>The requested viewer (ID: {id}) does not exist.</p>
           <button 
-            onClick={() => window.location.href = '/'} 
+            onClick={() => navigate('/')} 
             className="viewerButton"
           >
             Return to Home
@@ -540,13 +680,53 @@ const Viewer = () => {
   }
 
   return (
-    <div className="App">
-      <h1 className="sectionHeader">{viewerData.title}</h1>
-      {viewerData.description && (
-        <p style={{ textAlign: 'center', color: '#aaa', marginTop: '-10px' }}>
-          {viewerData.description}
-        </p>
-      )}
+    <div className="App" style={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(to right, #09162a, #0d284d, #113b72, #194f99)',
+      position: 'relative'
+    }}>
+      <header className="header">
+        <button className="launch-button" onClick={() => navigate("/")}>Home</button>
+        <div className="search-container">
+          <input
+            type="text"
+            className="search-bar"
+            placeholder="Search..."
+          />
+        </div>
+      </header>
+
+      <div style={{
+        position: 'relative',
+        zIndex: 1000,
+        paddingTop: '20px',
+        background: 'transparent'
+      }}>
+        <h1 className="sectionHeader" style={{
+          position: 'relative',
+          zIndex: 1001,
+          margin: '20px auto',
+          display: 'block',
+          textAlign: 'center',
+          color: '#b8e4ff',
+          fontSize: '36px',
+          fontWeight: '700'
+        }}>
+          {viewerData.title}
+        </h1>
+        {viewerData.description && (
+          <p style={{ 
+            textAlign: 'center', 
+            color: '#bbb', 
+            marginTop: '-10px',
+            position: 'relative',
+            zIndex: 1001,
+            fontSize: '16px'
+          }}>
+            {viewerData.description}
+          </p>
+        )}
+      </div>
       
       {renderCollaborationPanel()}
 
@@ -557,26 +737,28 @@ const Viewer = () => {
       )}
 
       {!show3D && viewerData.tileSource ? (
-        <div style={{ position: "relative" }}>
-          <h2>2D View {isJoined ? "- Click to Add Collaborative Annotations" : "- Join a room to collaborate"}</h2>
-          <div style={{ 
-            position: "relative", 
-            width: "100%", 
-            height: "600px",
-            overflow: "hidden" 
-          }}>
-            <div
-              id="openseadragon-viewer"
-              style={{ 
-                width: "100%", 
-                height: "100%", 
-                border: "1px solid black", 
-                position: "absolute",
-                top: 0,
-                left: 0,
-                zIndex: 1
-              }}
-            />
+        <div style={{ position: "relative", display: "flex", gap: "20px", padding: "0 20px" }}>
+          {/* Main viewer container */}
+          <div style={{ flex: 1, position: "relative" }}>
+            <h2>2D View {isJoined ? "- Click to Add Collaborative Annotations" : "- Join a room to collaborate"}</h2>
+            <div style={{ 
+              position: "relative", 
+              width: "100%", 
+              height: "600px",
+              overflow: "hidden" 
+            }}>
+              <div
+                id="openseadragon-viewer"
+                style={{ 
+                  width: "100%", 
+                  height: "100%", 
+                  border: "1px solid black", 
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  zIndex: 1
+                }}
+              />
             
             {/* Annotation and overlay container - positioned above OpenSeadragon but below UI controls */}
             <div style={{
@@ -651,14 +833,14 @@ const Viewer = () => {
                 />
               </div>
             )}
-          </div>
+            </div>
 
-          <DragPreview
-            dragPreview={dragPreview}
-            isVisible={isDragging || isResizing}
-          />
+            <DragPreview
+              dragPreview={dragPreview}
+              isVisible={isDragging || isResizing}
+            />
 
-          {inputVisible && isJoined && (
+            {inputVisible && isJoined && (
             <div
               className="annotationInput"
               style={{ 
@@ -690,6 +872,223 @@ const Viewer = () => {
                 </button>
                 <button onClick={saveAnnotation}>Save</button>
               </div>
+            </div>
+            )}
+          </div>
+
+          {/* Annotation Sidebar */}
+          {isJoined && (
+            <div 
+              className="annotation-list-sidebar"
+              style={{
+                width: showAnnotationSidebar ? '300px' : '60px',
+                background: 'rgba(0, 0, 0, 0.85)',
+                border: '1px solid #4CAF50',
+                borderRadius: '8px',
+                padding: '15px',
+                maxHeight: '600px',
+                overflowY: showAnnotationSidebar ? 'auto' : 'hidden',
+                color: 'white',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <div style={{ 
+                margin: '0 0 15px 0',
+                fontSize: '18px',
+                color: '#4CAF50',
+                borderBottom: showAnnotationSidebar ? '2px solid #4CAF50' : 'none',
+                paddingBottom: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                {showAnnotationSidebar ? (
+                  <>
+                    <span>Annotations</span>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '14px' }}>
+                        ({annotations.filter(a => !a.z && a.z !== 0).length})
+                      </span>
+                      <button
+                        onClick={() => setShowAnnotationSidebar(false)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1px solid #4CAF50',
+                          borderRadius: '4px',
+                          color: '#4CAF50',
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          fontSize: '16px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(76, 175, 80, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        }}
+                        title="Hide annotations panel"
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setShowAnnotationSidebar(true)}
+                    style={{
+                      background: 'rgba(76, 175, 80, 0.9)',
+                      border: '2px solid #4CAF50',
+                      borderRadius: '8px',
+                      color: 'white',
+                      cursor: 'pointer',
+                      padding: '8px',
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      width: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(76, 175, 80, 1)';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(76, 175, 80, 0.9)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    title="Show annotations panel"
+                  >
+                    <span>◀</span>
+                    <span style={{
+                      background: 'rgba(255,255,255,0.3)',
+                      borderRadius: '12px',
+                      padding: '4px 8px',
+                      fontSize: '12px'
+                    }}>
+                      {annotations.filter(a => !a.z && a.z !== 0).length}
+                    </span>
+                  </button>
+                )}
+              </div>
+              
+              {showAnnotationSidebar && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {annotations
+                  .filter(a => !a.z && a.z !== 0) // Only 2D annotations
+                  .map((annotation) => {
+                    const user = activeUsers.find(u => u.id === (annotation.user_id || annotation.userId));
+                    const isOwned = (annotation.user_id || annotation.userId) === currentUser.id;
+                    
+                    return (
+                      <div
+                        key={annotation.id}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: isOwned ? '2px solid #4CAF50' : '1px solid #666',
+                          borderRadius: '6px',
+                          padding: '10px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          position: 'relative'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(76, 175, 80, 0.2)';
+                          e.currentTarget.style.transform = 'translateX(5px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          marginBottom: '5px',
+                          color: '#fff'
+                        }}>
+                          {annotation.text}
+                        </div>
+                        
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#aaa',
+                          marginBottom: '8px'
+                        }}>
+                          By: {user?.name || 'Unknown'}
+                        </div>
+                        
+                        <button
+                          onClick={() => handleTeleportToAnnotation(annotation)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 10px',
+                            background: '#2196F3',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            transition: 'background 0.2s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#1976D2';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#2196F3';
+                          }}
+                        >
+                          🎯 Teleport Here
+                        </button>
+                        
+                        {isOwned && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeAnnotation(annotation.id);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: '5px',
+                              right: '5px',
+                              background: 'rgba(244, 67, 54, 0.8)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '20px',
+                              height: '20px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0
+                            }}
+                            title="Delete annotation"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                
+                  {annotations.filter(a => !a.z && a.z !== 0).length === 0 && (
+                    <div style={{
+                      textAlign: 'center',
+                      color: '#999',
+                      padding: '20px',
+                      fontSize: '14px'
+                    }}>
+                      No annotations yet. Click on the image to add one!
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

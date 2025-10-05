@@ -166,6 +166,88 @@ const MoonPlane = React.forwardRef(({ heightScale }, ref) => {
 });
 
 /**
+ * Safe Pointer Lock Controls wrapper
+ */
+function SafePointerLockControls({ onLock, onUnlock, enabled = true }) {
+  const { gl } = useThree();
+  const controlsRef = useRef();
+  const mountedRef = useRef(true);
+  
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    // Verify canvas element exists and is in DOM
+    const canvas = gl.domElement;
+    if (!canvas || !document.body.contains(canvas)) {
+      console.warn('Canvas not ready for pointer lock');
+      return;
+    }
+    
+    // Add small delay to ensure DOM is stable
+    const timer = setTimeout(() => {
+      if (!mountedRef.current || !enabled) return;
+      
+      const handleClick = () => {
+        if (!mountedRef.current || !enabled) return;
+        
+        // Double-check canvas is still in DOM
+        if (!document.body.contains(canvas)) {
+          console.warn('Canvas removed from DOM, cannot lock pointer');
+          return;
+        }
+        
+        try {
+          canvas.requestPointerLock();
+        } catch (error) {
+          console.error('Failed to request pointer lock:', error);
+        }
+      };
+      
+      canvas.addEventListener('click', handleClick);
+      
+      // Cleanup
+      return () => {
+        canvas.removeEventListener('click', handleClick);
+      };
+    }, 100);
+    
+    return () => {
+      clearTimeout(timer);
+      mountedRef.current = false;
+      if (document.pointerLockElement === canvas) {
+        try {
+          document.exitPointerLock();
+        } catch (error) {
+          console.warn('Error exiting pointer lock on cleanup:', error);
+        }
+      }
+    };
+  }, [gl, enabled]);
+  
+  useEffect(() => {
+    const handleLockChange = () => {
+      if (document.pointerLockElement === gl.domElement) {
+        if (onLock) onLock();
+      } else {
+        if (onUnlock) onUnlock();
+      }
+    };
+    
+    document.addEventListener('pointerlockchange', handleLockChange);
+    document.addEventListener('pointerlockerror', (e) => {
+      console.error('Pointer lock error:', e);
+      if (onUnlock) onUnlock();
+    });
+    
+    return () => {
+      document.removeEventListener('pointerlockchange', handleLockChange);
+    };
+  }, [gl, onLock, onUnlock]);
+  
+  return enabled ? <PointerLockControls ref={controlsRef} /> : null;
+}
+
+/**
  * First Person Controls with position broadcasting and collision detection
  */
 function CollaborativeFirstPersonControls({ 
@@ -184,12 +266,33 @@ function CollaborativeFirstPersonControls({
   const keysRef = useRef({});
   const lastUpdateTime = useRef(0);
   const controlsRef = useRef();
+  const mountedRef = useRef(true);
+  
+  // Track component mount state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Ensure pointer lock is released on unmount
+      if (document.pointerLockElement) {
+        try {
+          document.exitPointerLock();
+        } catch (error) {
+          console.warn('Error exiting pointer lock on unmount:', error);
+        }
+      }
+    };
+  }, []);
   
   // Disable pointer lock when entering UI mode
   useEffect(() => {
-    if (uiMode && document.pointerLockElement) {
+    if (uiMode && document.pointerLockElement && mountedRef.current) {
       console.log('UI Mode enabled, exiting pointer lock');
-      document.exitPointerLock();
+      try {
+        document.exitPointerLock();
+      } catch (error) {
+        console.warn('Failed to exit pointer lock:', error);
+      }
     }
   }, [uiMode]);
   
@@ -326,14 +429,9 @@ function CollaborativeFirstPersonControls({
   
 
   
-  // Don't render PointerLockControls in UI mode
-  if (uiMode) {
-    return null;
-  }
-  
   return (
-    <PointerLockControls 
-      ref={controlsRef}
+    <SafePointerLockControls
+      enabled={!uiMode && !isAnnotating}
       onLock={() => {
         console.log('Pointer locked');
         if (onLockChange) onLockChange(true);
@@ -449,7 +547,8 @@ function CollaborativeThreeScene({
       isJoined,
       activeUsersCount: activeUsers?.length || 0,
       annotationsCount: annotations?.length || 0,
-      userPositionsCount: userPositions?.size || 0
+      userPositionsCount: userPositions?.size || 0,
+      annotationsSample: annotations?.slice(0, 2)  // Show first 2 annotations for debugging
     });
   }, [connected, mockMode, currentUser, isJoined, activeUsers, annotations, userPositions]);
   
@@ -512,6 +611,16 @@ function CollaborativeThreeScene({
       console.log('Toggling UI mode from', prev, 'to', newMode);
       return newMode;
     });
+  }, []);
+  
+  // Prevent pointer lock errors by ensuring DOM is ready
+  const canvasReadyRef = useRef(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      canvasReadyRef.current = true;
+    }, 100); // Small delay to ensure canvas is mounted
+    
+    return () => clearTimeout(timer);
   }, []);
   
   // Handle Tab key to toggle UI mode
@@ -662,19 +771,25 @@ function CollaborativeThreeScene({
       )}
       
       {!locked && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 100,
-          background: 'rgba(0,0,0,0.9)',
-          padding: '30px',
-          borderRadius: '12px',
-          color: 'white',
-          textAlign: 'center',
-          maxWidth: '500px'
-        }}>
+        <div 
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 100,
+            background: 'rgba(0,0,0,0.9)',
+            padding: '30px',
+            borderRadius: '12px',
+            color: 'white',
+            textAlign: 'center',
+            maxWidth: '500px'
+          }}
+          onClick={(e) => {
+            // Prevent immediate pointer lock on instruction overlay
+            e.stopPropagation();
+          }}
+        >
           <h3> Collaborative Lunar Terrain</h3>
           <p style={{ marginBottom: '20px' }}>Click anywhere to start exploring</p>
           
@@ -851,6 +966,10 @@ function CollaborativeThreeScene({
           position: 'absolute',
           top: 0,
           left: 0
+        }}
+        onCreated={({ gl }) => {
+          // Ensure canvas is properly attached to DOM before pointer lock attempts
+          gl.domElement.style.touchAction = 'none';
         }}
       >
         {/* Starry sky background */}

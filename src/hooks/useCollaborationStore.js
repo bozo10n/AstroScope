@@ -176,8 +176,16 @@ export const useCollaborationStore = () => {
       ));
     });
 
+    // Handle room-full event
+    newSocket.on('room-full', (data) => {
+      console.log(`🚫 Room ${data.fullRoomId} is full (${data.currentCapacity}/${data.maxCapacity})`);
+      console.log(`✅ Suggested room: ${data.suggestedRoomId}`);
+      // Emit custom event that the component can listen to
+      window.dispatchEvent(new CustomEvent('room-full', { detail: data }));
+    });
+
     return newSocket;
-  }, [socket]);
+  }, [socket, mockMode]);
 
   const joinRoom = useCallback((roomId, userName, socketInstance = null) => {
     const userId = Math.random().toString(36).substring(7);

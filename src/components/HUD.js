@@ -21,6 +21,19 @@ function HUD({
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
   const [exportStatus, setExportStatus] = useState(null);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('📋 HUD annotations:', {
+      total: annotations.length,
+      annotations: annotations.map(a => ({
+        id: a.id,
+        text: a.text,
+        hasZ: a.z !== undefined && a.z !== null,
+        coords: { x: a.x, y: a.y, z: a.z }
+      }))
+    });
+  }, [annotations]);
+
   if (!show) return null;
 
   // Calculate distance from current position to annotation
@@ -41,6 +54,9 @@ function HUD({
     .filter(a => a.x !== undefined && a.x !== null) // Ensure valid coordinates
     .map(annotation => ({
       ...annotation,
+      // Normalize field names (handle both camelCase and snake_case from server)
+      userId: annotation.userId || annotation.user_id,
+      userName: annotation.userName || annotation.user_name,
       distance: calculateDistance(annotation)
     }))
     .filter(a => a.distance !== null && a.distance !== undefined)

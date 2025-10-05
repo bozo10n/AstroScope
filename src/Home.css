@@ -223,8 +223,6 @@ body
   position: relative;
   display: inline-block;
   margin-bottom: 30px;
-  background: linear-gradient(90deg, #a8d8ff, #4fa3ff, #1d6fff);
-  -webkit-background-clip: text;
   animation: headerGlow 4s ease-in-out infinite alternate;
 }
 

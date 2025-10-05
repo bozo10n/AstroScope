@@ -13,14 +13,24 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
+
+// Configure CORS for production and development
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? ['https://unlrealities.ca', 'https://www.unlrealities.ca']
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3001'];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST']
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -49,10 +59,12 @@ const upload = multer({
   }
 });
 
-const db = new sqlite3.Database('./nasa_viewer.db', (err) => {
+// Use absolute path for database to avoid path issues
+const dbPath = path.join(__dirname, 'nasa_viewer.db');
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) console.error('Error opening database:', err);
   else {
-    console.log(' Connected to SQLite database');
+    console.log('✓ Connected to SQLite database at', dbPath);
     initializeDatabase();
   }
 });
@@ -74,10 +86,41 @@ function initializeDatabase() {
   });
 }
 
+// Room management
 const rooms = new Map();
+const MAX_ROOM_CAPACITY = 3; // Maximum users per room
+
+// Helper function to get room user count
+function getRoomUserCount(roomId) {
+  const room = rooms.get(roomId);
+  return room ? room.size : 0;
+}
+
+// Helper function to find next available room
+function findAvailableRoom(baseRoomId) {
+  let nextRoomId = parseInt(baseRoomId);
+  while (getRoomUserCount(nextRoomId.toString()) >= MAX_ROOM_CAPACITY) {
+    nextRoomId++;
+  }
+  return nextRoomId.toString();
+}
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/api/rooms', (req, res) => db.all('SELECT * FROM rooms ORDER BY last_activity DESC', [], (err, rows) => err ? res.status(500).json({ error: err.message }) : res.json(rows)));
+app.get('/api/room-capacity/:roomId', (req, res) => {
+  const { roomId } = req.params;
+  const currentUsers = getRoomUserCount(roomId);
+  const isFull = currentUsers >= MAX_ROOM_CAPACITY;
+  const nextAvailableRoom = isFull ? findAvailableRoom(roomId) : roomId;
+  
+  res.json({
+    roomId,
+    currentUsers,
+    maxCapacity: MAX_ROOM_CAPACITY,
+    isFull,
+    nextAvailableRoom
+  });
+});
 app.post('/api/rooms', (req, res) => {
   const { name, description } = req.body;
   db.run('INSERT INTO rooms (name, description) VALUES (?, ?)', [name, description], function(err) {
@@ -96,6 +139,21 @@ io.on('connection', (socket) => {
 
   socket.on('join-room', (data) => {
     const { roomId, userName, userId } = data;
+    
+    // Check if room is at capacity
+    if (getRoomUserCount(roomId) >= MAX_ROOM_CAPACITY) {
+      const nextRoomId = findAvailableRoom(roomId);
+      console.log(`Room ${roomId} is full (${MAX_ROOM_CAPACITY}/${MAX_ROOM_CAPACITY}). Redirecting to room ${nextRoomId}`);
+      
+      socket.emit('room-full', {
+        fullRoomId: roomId,
+        suggestedRoomId: nextRoomId,
+        currentCapacity: getRoomUserCount(roomId),
+        maxCapacity: MAX_ROOM_CAPACITY
+      });
+      return;
+    }
+    
     currentRoom = roomId;
     currentUser = { id: userId, name: userName, socketId: socket.id };
     
@@ -309,4 +367,10 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => console.log('Server running on http://localhost:' + PORT));
+const HOST = process.env.HOST || '0.0.0.0';
+
+httpServer.listen(PORT, HOST, () => {
+  console.log(`✓ Server running on http://${HOST}:${PORT}`);
+  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✓ Allowed origins:`, allowedOrigins);
+});
