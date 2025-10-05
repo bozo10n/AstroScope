@@ -19,7 +19,6 @@ const UserCursor = ({ userId, position, userName }) => {
 
   return (
     <div className="user-cursor" style={getCursorStyle()}>
-      <span className="cursor-icon">👆</span>
       <span className="cursor-name">{userName}</span>
     </div>
   );
