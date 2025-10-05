@@ -112,10 +112,13 @@ body
   width: calc(50% - 15px);
   box-sizing: border-box;
   transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .tile:hover {
-  background-color: rgba(64, 119, 165, 0.05);
+  background-color: rgba(64, 119, 165, 0.25);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(100, 150, 255, 0.3);
 }
 
 .tile-title {

@@ -42,12 +42,12 @@ class TIFFToDeepZoom:
         
         # Calculate number of levels
         max_dimension = max(width, height)
-        num_levels = 0
-        temp = max_dimension
-        while temp > self.tile_size:
-            temp = temp / 2
-            num_levels += 1
-        num_levels += 1
+        num_levels = 6
+        # temp = max_dimension
+        # while temp > self.tile_size:
+        #     temp = temp / 2
+        #     num_levels += 1
+        # num_levels += 1
         
         print(f"Generating {num_levels} zoom levels...")
         
