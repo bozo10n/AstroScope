@@ -12,7 +12,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/home" element={<Home />} />
-        <Route path="/viewer" element={<Viewer />} />
+        <Route path="/viewer/:id" element={<Viewer />} />
         <Route path="/moon" element={<MoonTerrain />} />
       </Routes>
     </Router>

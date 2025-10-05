@@ -9,6 +9,7 @@ import ImageOverlay from "./components/ImageOverlay";
 import ViewerToolbar from "./components/ViewerToolbar";
 import DragPreview from "./components/DragPreview";
 import "./Viewer.css";
+import { useParams } from "react-router-dom";
 
 // Constants
 const TILE_SOURCE_CONFIG = {
@@ -32,6 +33,10 @@ const VIEWPORT_BOUNDS = {
 };
 
 const Viewer = () => {
+  // this is passed from the /viewer/(id) param
+  // use this to get image
+  const { id } = useParams(); 
+
   // Refs
   const viewerRef = useRef(null);
   
