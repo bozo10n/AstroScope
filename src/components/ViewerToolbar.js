@@ -15,28 +15,28 @@ const ViewerToolbar = ({
         onClick={onZoomIn}
         title="Zoom In"
       >
-        🔍+
+        +
       </button>
       <button 
         className="tool-btn" 
         onClick={onZoomOut}
         title="Zoom Out"
       >
-        🔍−
+        -
       </button>
       <button 
         className="tool-btn" 
         onClick={onResetView}
         title="Reset View"
       >
-        🏠
+        Reset
       </button>
       <button 
         className="tool-btn" 
         onClick={onToggleFullscreen}
         title="Fullscreen"
       >
-        ⛶
+        Full
       </button>
     </div>
   );
