@@ -1,6 +1,6 @@
-# Space Viewer
+# Astro Scope
 
-The Space Viewer is a web-based platform for the collaborative exploration of high-resolution geological data, featuring both a 2D deep-zoom image viewer and an immersive 3D/VR moon terrain visualization. It is designed for real-time teamwork, allowing multiple users to explore, annotate, and share findings simultaneously.
+The Astro Scope is a web-based platform for the collaborative exploration of high-resolution geological data, featuring both a 2D deep-zoom image viewer and an immersive 3D/VR moon terrain visualization. It is designed for real-time teamwork, allowing multiple users to explore, annotate, and share findings simultaneously.
 
 ## Table of Contents
 - [Key Features](#key-features)
