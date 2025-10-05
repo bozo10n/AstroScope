@@ -24,7 +24,11 @@ export const useCollaborationStore = () => {
     }
     
     console.log('🔌 Creating new socket connection...');
-    const socketUrl = 'http://localhost:3000'; // Connect to local server
+    // Use production backend URL when deployed, localhost for development
+    const socketUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://unlrealities.ca:3000'
+      : 'http://localhost:3000';
+    console.log(`Connecting to: ${socketUrl}`);
     const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       forceNew: false, // Reuse connection if available
