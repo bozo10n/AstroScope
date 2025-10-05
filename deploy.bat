@@ -49,6 +49,9 @@ echo ✓ Pushed to GitHub
 echo.
 
 echo [6/6] Deploying to server...
+echo Copying backend environment file...
+scp backend\.env.production root@165.22.230.192:/var/www/Space-Viewer/backend/.env
+echo Pulling latest code and restarting...
 ssh root@165.22.230.192 "cd /var/www/Space-Viewer && git pull origin production && git lfs pull && cd backend && npm install && pm2 restart space-viewer-backend"
 if %errorlevel% neq 0 (
     echo ERROR: Server deployment failed!

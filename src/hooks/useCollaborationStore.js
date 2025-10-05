@@ -25,9 +25,11 @@ export const useCollaborationStore = () => {
     
     console.log('🔌 Creating new socket connection...');
     // Use production backend URL when deployed, localhost for development
-    const socketUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://unlrealities.ca:3000'
-      : 'http://localhost:3000';
+    // REACT_APP_BACKEND_URL can be set in .env for custom backend location
+    const socketUrl = process.env.REACT_APP_BACKEND_URL || 
+      (process.env.NODE_ENV === 'production' 
+        ? 'https://unlrealities.ca'  // Changed: removed port 3000, use proxy or same origin
+        : 'http://localhost:3000');
     console.log(`Connecting to: ${socketUrl}`);
     const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],
