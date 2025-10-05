@@ -1,0 +1,64 @@
+@echo off
+echo ========================================
+echo    Deploying Space Viewer
+echo ========================================
+echo.
+
+echo [1/6] Checking dependencies...
+if not exist "node_modules\" (
+    echo Installing frontend dependencies...
+    call npm install
+    if %errorlevel% neq 0 (
+        echo ERROR: npm install failed!
+        pause
+        exit /b %errorlevel%
+    )
+)
+echo ✓ Dependencies ready
+echo.
+
+echo [2/6] Building React frontend...
+call npm run build
+if %errorlevel% neq 0 (
+    echo ERROR: Build failed!
+    pause
+    exit /b %errorlevel%
+)
+echo ✓ Build complete
+echo.
+
+echo [2/5] Staging changes...
+git add .
+echo ✓ Changes staged
+echo.
+
+echo [3/5] Committing...
+set commit_msg=Deploy: %date% %time%
+git commit -m "%commit_msg%"
+echo ✓ Committed
+echo.
+
+echo [4/5] Pushing to GitHub...
+git push origin production
+if %errorlevel% neq 0 (
+    echo ERROR: Push failed!
+    pause
+    exit /b %errorlevel%
+)
+echo ✓ Pushed to GitHub
+echo.
+
+echo [5/5] Deploying to server...
+ssh root@165.22.230.192 "cd /var/www/Space-Viewer && git pull origin production && cd backend && npm install && pm2 restart space-viewer-backend"
+if %errorlevel% neq 0 (
+    echo ERROR: Server deployment failed!
+    pause
+    exit /b %errorlevel%
+)
+echo.
+
+echo ========================================
+echo    ✓ Deployment Complete!
+echo    Site: https://unlrealities.ca
+echo ========================================
+pause
