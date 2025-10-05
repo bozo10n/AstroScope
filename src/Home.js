@@ -99,93 +99,63 @@ const Home = () => {
       <h1 className="pageTitle">AstroScope</h1>
 
       <section className="tiles">
-        <h2 className="sectionHeader">Popular</h2>
+        <h2 className="sectionHeader">2D</h2>
         <div className="tileContainer">
           <div className="tile">
-            <span className="tile-title">Tile 1</span>
+            <span className="tile-title">The Galaxy</span>
             <button className="launch-button" onClick={() => navigate("/Viewer/1")}>
               Launch
             </button>
           </div>
           <div className="tile">
-            <span className="tile-title">Tile 2</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/2")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
           </div>
         </div>
         <div className="tileContainer">
           <div className="tile">
-            <span className="tile-title">Tile 3</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/3")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
           </div>
           <div className="tile">
-            <span className="tile-title">Tile 4</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/4")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
           </div>
         </div>
         <div className="tileContainer">
           <div className="tile">
-            <span className="tile-title">Tile 5</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/5")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
           </div>
           <div className="tile">
-            <span className="tile-title">Tile 6</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/6")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
           </div>
         </div>
       </section>
 
       <section className="tiles">
-        <h2 className="sectionHeader">Recent</h2>
+        <h2 className="sectionHeader">2D and 3D</h2>
         <div className="tileContainer">
           <div className="tile">
-            <span className="tile-title">Tile 1</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/1")}>
-              Launch
-            </button>
-          </div>
-          <div className="tile">
-            <span className="tile-title">Tile 2</span>
+            <span className="tile-title">The Moon</span>
             <button className="launch-button" onClick={() => navigate("/Viewer/2")}>
               Launch
             </button>
           </div>
-        </div>
-        <div className="tileContainer">
           <div className="tile">
-            <span className="tile-title">Tile 3</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/3")}>
-              Launch
-            </button>
-          </div>
-          <div className="tile">
-            <span className="tile-title">Tile 4</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/4")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
           </div>
         </div>
         <div className="tileContainer">
           <div className="tile">
-            <span className="tile-title">Tile 5</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/5")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
           </div>
           <div className="tile">
-            <span className="tile-title">Tile 6</span>
-            <button className="launch-button" onClick={() => navigate("/Viewer/6")}>
-              Launch
-            </button>
+            <span className="tile-title">Coming soon...</span>
+          </div>
+        </div>
+        <div className="tileContainer">
+          <div className="tile">
+            <span className="tile-title">Coming soon...</span>
+          </div>
+          <div className="tile">
+            <span className="tile-title">Coming soon...</span>
           </div>
         </div>
       </section>
