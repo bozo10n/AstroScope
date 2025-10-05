@@ -599,16 +599,17 @@ function CollaborativeThreeScene({
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 99,
-          background: 'rgba(0, 255, 0, 0.9)',
-          color: '#000',
+          background: 'rgba(100, 150, 255, 0.9)',
+          color: '#fff',
           padding: '8px 16px',
           borderRadius: '20px',
           fontSize: '12px',
           fontWeight: 'bold',
           pointerEvents: 'none',
-          boxShadow: '0 0 20px rgba(0, 255, 0, 0.5)'
+          boxShadow: '0 0 20px rgba(100, 150, 255, 0.5)',
+          textShadow: '0 0 5px #000'
         }}>
-          🖱️ UI MODE - Press TAB to return to camera control
+          UI MODE - Press TAB to return to camera control
         </div>
       )}
       
@@ -626,7 +627,7 @@ function CollaborativeThreeScene({
           textAlign: 'center',
           maxWidth: '500px'
         }}>
-          <h3>🌙 Collaborative Lunar Terrain</h3>
+          <h3> Collaborative Lunar Terrain</h3>
           <p style={{ marginBottom: '20px' }}>Click anywhere to start exploring</p>
           
           <div style={{ 
@@ -653,14 +654,14 @@ function CollaborativeThreeScene({
             <div style={{ marginBottom: '10px' }}>
               <strong style={{ color: '#FFA726' }}>UI Interaction:</strong><br/>
               <strong>TAB</strong> - Toggle UI mode (click HUD elements)<br/>
-              <strong>❌ Button</strong> - Exit camera control<br/>
+              <strong>Exit Button</strong> - Exit camera control<br/>
               <span style={{ fontSize: '12px', color: '#999' }}>
                 (Use TAB to interact with annotations, export PDFs, etc.)
               </span>
             </div>
             <div>
               <strong style={{ color: '#FF6B6B' }}>Exit:</strong><br/>
-              <strong>ESC</strong> or <strong>❌ Button</strong> - Leave camera control
+              <strong>ESC</strong> or <strong> Button</strong> - Leave camera control
             </div>
           </div>
           
@@ -674,7 +675,7 @@ function CollaborativeThreeScene({
               padding: '8px',
               borderRadius: '6px'
             }}>
-              ✅ Connected - You can see other users and annotations in real-time!
+               Connected - You can see other users and annotations in real-time!
             </p>
           )}
         </div>
@@ -765,7 +766,7 @@ function CollaborativeThreeScene({
         minWidth: '200px',
         pointerEvents: locked ? 'none' : 'auto'
       }}>
-        <h4 style={{ margin: '0 0 10px 0' }}>🌍 Collaboration</h4>
+        <h4 style={{ margin: '0 0 10px 0', fontFamily: 'Orbitron, sans-serif', color: '#fff', textShadow: '0 0 5px rgba(255, 255, 255, 0.5)' }}>Collaboration</h4>
         {isJoined ? (
           <div style={{ fontSize: '13px' }}>
             <div style={{ marginBottom: '8px' }}>
@@ -778,11 +779,12 @@ function CollaborativeThreeScene({
               <strong>Annotations:</strong> {annotations.length}
             </div>
             <div style={{ 
-              fontSize: '11px', 
-              color: mockMode ? '#FFA500' : '#4CAF50',
+              fontSize: '12px', 
+              fontWeight: 'bold',
+              color: mockMode ? '#FFA500' : '#6495ED',
               marginTop: '8px'
             }}>
-              {mockMode ? '🤖 Mock Mode' : '🟢 Connected'}
+              {mockMode ? 'Mock Mode' : 'Connected'}
             </div>
           </div>
         ) : (
@@ -874,7 +876,7 @@ function CollaborativeThreeScene({
           <button
             onClick={toggleUiMode}
             style={{
-              background: uiMode ? 'rgba(0, 255, 0, 0.9)' : 'rgba(100, 150, 255, 0.9)',
+              background: uiMode ? 'rgba(100, 150, 255, 0.9)' : 'rgba(100, 150, 255, 0.7)',
               color: 'white',
               border: '2px solid rgba(255, 255, 255, 0.3)',
               padding: '10px 15px',
@@ -882,7 +884,7 @@ function CollaborativeThreeScene({
               cursor: 'pointer',
               fontSize: '14px',
               fontWeight: 'bold',
-              boxShadow: uiMode ? '0 0 15px rgba(0, 255, 0, 0.5)' : '0 0 15px rgba(100, 150, 255, 0.5)',
+              boxShadow: '0 0 15px rgba(100, 150, 255, 0.5)',
               transition: 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
@@ -892,7 +894,7 @@ function CollaborativeThreeScene({
               e.target.style.transform = 'scale(1)';
             }}
           >
-            {uiMode ? '🎮 Camera Mode' : '🖱️ UI Mode'}
+            {uiMode ? 'Camera Mode' : ' UI Mode'}
           </button>
           
           {/* Exit Button (only in camera mode) */}
@@ -923,7 +925,7 @@ function CollaborativeThreeScene({
                 e.target.style.transform = 'scale(1)';
               }}
             >
-              ❌ Exit
+              Exit
             </button>
           )}
         </div>

@@ -58,11 +58,11 @@ function HUD({
   const handleExportPDF = () => {
     try {
       const filename = exportAnnotationsToPDF(annotations, currentUser, activeUsers);
-      setExportStatus(`✅ Exported: ${filename}`);
+      setExportStatus(`Exported: ${filename}`);
       setTimeout(() => setExportStatus(null), 3000);
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      setExportStatus('❌ Export failed');
+      setExportStatus('Export failed');
       setTimeout(() => setExportStatus(null), 3000);
     }
   };
@@ -71,11 +71,11 @@ function HUD({
     event.stopPropagation(); // Prevent teleport
     try {
       const filename = exportSingleAnnotationPDF(annotation, currentUser);
-      setExportStatus(`✅ Exported: ${filename}`);
+      setExportStatus(`Exported: ${filename}`);
       setTimeout(() => setExportStatus(null), 3000);
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      setExportStatus('❌ Export failed');
+      setExportStatus('Export failed');
       setTimeout(() => setExportStatus(null), 3000);
     }
   };
@@ -94,7 +94,6 @@ function HUD({
       {/* Left Side - Annotation List with Teleport */}
       <div className="hud-panel hud-left">
         <div className="hud-header">
-          <span className="hud-icon">📍</span>
           <div className="hud-title">Locations ({annotationsWithDistance.length})</div>
           <button 
             className="hud-export-btn"
@@ -102,7 +101,7 @@ function HUD({
             disabled={annotationsWithDistance.length === 0}
             title="Export all annotations as PDF report"
           >
-            📄 Export PDF
+            Export PDF
           </button>
         </div>
         
@@ -138,7 +137,7 @@ function HUD({
                   
                   <div className="hud-annotation-meta">
                     <span className="hud-annotation-distance">
-                      📏 {(annotation.distance || 0).toFixed(1)}m away
+                      {(annotation.distance || 0).toFixed(1)}m away
                     </span>
                     {annotation.userName && (
                       <span className="hud-annotation-user">
@@ -184,7 +183,7 @@ function HUD({
       {/* Top Right - User Info */}
       <div className="hud-panel hud-top-right">
         <div className="hud-section">
-          <div className="hud-label">👥 ACTIVE USERS</div>
+          <div className="hud-label">ACTIVE USERS</div>
           <div className="hud-value-medium">{activeUsers.length}</div>
         </div>
         
@@ -215,7 +214,7 @@ function HUD({
             </>
           ) : (
             <>
-              <span className="hud-key">❌ Button</span> Exit
+              <span className="hud-key">Esc</span> Exit Mode
             </>
           )}
         </div>

@@ -19,17 +19,16 @@ const DragPreview = ({
     };
   };
 
-  const getIcon = () => {
-    switch (dragPreview.type) {
-      case 'annotation':
-        return '📌';
-      case 'overlay':
-        return '🖼️';
-      default:
-        return '⋯';
-    }
-  };
-
+      const getIcon = () => {
+          switch (dragPreview.type) {
+              case 'annotation':
+                  return 'Pin';
+              case 'overlay':
+                  return 'Image';
+              default:
+                  return '⋯';
+          }
+      };
   return (
     <div 
       className="drag-preview"

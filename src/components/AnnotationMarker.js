@@ -61,7 +61,7 @@ const AnnotationMarker = ({
               className="annotation-delete-btn"
               onClick={handleRemove}
             >
-              🗑️ Delete
+              Delete
             </button>
           )}
         </div>
