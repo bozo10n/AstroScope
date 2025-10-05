@@ -9,7 +9,6 @@ import ImageOverlay from "./components/ImageOverlay";
 import ViewerToolbar from "./components/ViewerToolbar";
 import DragPreview from "./components/DragPreview";
 import "./Viewer.css";
-import { useParams } from "react-router-dom";
 import viewerConfig from "./viewerConfig.json";
 import { useParams, useNavigate } from "react-router-dom";
 
