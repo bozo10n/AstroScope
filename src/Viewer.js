@@ -10,19 +10,9 @@ import ViewerToolbar from "./components/ViewerToolbar";
 import DragPreview from "./components/DragPreview";
 import "./Viewer.css";
 import { useParams } from "react-router-dom";
+import viewerConfig from "./viewerConfig.json";
 
 let shootingStarInterval;
-
-// Constants
-const TILE_SOURCE_CONFIG = {
-  width: 10121,
-  height: 7085,
-  tileSize: 254,
-  tileOverlap: 1,
-  minLevel: 0,
-  maxLevel: 6,
-  getTileUrl: (level, x, y) => `/space1/space1_files/${level}/${x}_${y}.jpg`
-};
 
 const ZOOM_FACTOR = {
   IN: 1.5,
@@ -112,6 +102,31 @@ const Viewer = () => {
   // this is passed from the /viewer/(id) param
   // use this to get image
   const { id } = useParams(); 
+  
+  // Get viewer configuration based on ID
+  const viewerData = viewerConfig.viewers.find(v => v.id === id);
+  
+  // Generate tile source config from viewer data
+  const getTileSourceConfig = () => {
+    if (!viewerData || !viewerData.tileSource) return null;
+    
+    const { tileSource } = viewerData;
+    if (tileSource.type === "dzi") {
+      return {
+        width: tileSource.width,
+        height: tileSource.height,
+        tileSize: tileSource.tileSize,
+        tileOverlap: tileSource.tileOverlap,
+        minLevel: tileSource.minLevel,
+        maxLevel: tileSource.maxLevel,
+        getTileUrl: (level, x, y) => tileSource.getTileUrl
+          .replace("{level}", level)
+          .replace("{x}", x)
+          .replace("{y}", y)
+      };
+    }
+    return null;
+  };
 
   // Refs
   const viewerRef = useRef(null);
@@ -184,10 +199,17 @@ const Viewer = () => {
 
   // Initialize OpenSeadragon viewer
   useEffect(() => {
+    const tileSourceConfig = getTileSourceConfig();
+    
+    // Only initialize viewer if we have a valid tile source (for 2D viewers)
+    if (!tileSourceConfig) {
+      return;
+    }
+    
     const viewer = OpenSeadragon({
       id: "openseadragon-viewer",
       prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
-      tileSources: TILE_SOURCE_CONFIG,
+      tileSources: tileSourceConfig,
       showNavigator: true,
       navigatorPosition: "BOTTOM_RIGHT",
       navigatorSizeRatio: 0.15,
@@ -200,7 +222,7 @@ const Viewer = () => {
     viewer.addHandler("viewport-change", handleViewportChange);
 
     return () => viewer.destroy();
-  }, [handleCanvasClick, handleViewportChange]);
+  }, [id, handleCanvasClick, handleViewportChange]);
 
   // Drag move handler
   const handleDragMove = useCallback((event) => {
@@ -494,17 +516,47 @@ const Viewer = () => {
     </div>
   );
 
+  // If viewer not found, show error
+  if (!viewerData) {
+    return (
+      <div className="App">
+        <h1 className="sectionHeader">Space Viewer</h1>
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '50px',
+          color: 'white'
+        }}>
+          <h2>Viewer not found</h2>
+          <p>The requested viewer (ID: {id}) does not exist.</p>
+          <button 
+            onClick={() => window.location.href = '/'} 
+            className="viewerButton"
+          >
+            Return to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="App">
-      <h1 className="sectionHeader ">Space Viewer</h1>
+      <h1 className="sectionHeader">{viewerData.title}</h1>
+      {viewerData.description && (
+        <p style={{ textAlign: 'center', color: '#aaa', marginTop: '-10px' }}>
+          {viewerData.description}
+        </p>
+      )}
       
       {renderCollaborationPanel()}
 
-      <button onClick={() => setShow3D(!show3D)} className="viewerButton">
-        {show3D ? "Show 2D View" : "Show 3D View"}
-      </button>
+      {viewerData.has3D && (
+        <button onClick={() => setShow3D(!show3D)} className="viewerButton">
+          {show3D ? "Show 2D View" : "Show 3D View"}
+        </button>
+      )}
 
-      {!show3D ? (
+      {!show3D && viewerData.tileSource ? (
         <div style={{ position: "relative" }}>
           <h2>2D View {isJoined ? "- Click to Add Collaborative Annotations" : "- Join a room to collaborate"}</h2>
           <div style={{ 
@@ -641,11 +693,12 @@ const Viewer = () => {
             </div>
           )}
         </div>
-      ) : (
+      ) : show3D && viewerData.has3D && viewerData.moon3D ? (
         <div>
           <h2>3D Collaborative View</h2>
           {isJoined ? (
             <CollaborativeThreeScene 
+              heightScale={viewerData.moon3D.heightScale}
               collaborationData={{
                 connected,
                 mockMode,
@@ -674,7 +727,21 @@ const Viewer = () => {
             </div>
           )}
         </div>
-      )}
+      ) : show3D && viewerData.has3D ? (
+        <div style={{ 
+          padding: '40px', 
+          textAlign: 'center',
+          background: 'rgba(255, 255, 255, 0.1)',
+          margin: '20px',
+          borderRadius: '12px',
+          border: '2px dashed #666'
+        }}>
+          <h3>3D view configuration incomplete</h3>
+          <p style={{ color: '#666' }}>
+            This viewer supports 3D but the configuration data is missing
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 };

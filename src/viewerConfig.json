@@ -1,0 +1,122 @@
+{
+  "viewers": [
+    {
+      "id": "1",
+      "title": "The Galaxy",
+      "description": "Deep zoom view of a galaxy image",
+      "type": "2D",
+      "category": "2D",
+      "enabled": true,
+      "has3D": false,
+      "tileSource": {
+        "type": "dzi",
+        "width": 10121,
+        "height": 7085,
+        "tileSize": 254,
+        "tileOverlap": 1,
+        "minLevel": 0,
+        "maxLevel": 6,
+        "getTileUrl": "/space1/space1_files/{level}/{x}_{y}.jpg",
+        "dziPath": "/space1/space1.dzi"
+      }
+    },
+    {
+      "id": "2",
+      "title": "The Moon",
+      "description": "Interactive 2D and 3D moon terrain viewer",
+      "type": "2D-3D",
+      "category": "2D and 3D",
+      "enabled": true,
+      "has3D": true,
+      "tileSource": {
+        "type": "dzi",
+        "width": 8192,
+        "height": 4096,
+        "tileSize": 256,
+        "tileOverlap": 1,
+        "minLevel": 0,
+        "maxLevel": 5,
+        "getTileUrl": "/moon1/moon1_files/{level}/{x}_{y}.jpg",
+        "dziPath": "/moon1/moon1.dzi"
+      },
+      "moon3D": {
+        "colorTexture": "/moon_data/moon_color.png",
+        "heightTexture": "/moon_data/moon_height.png",
+        "heightScale": 0.15
+      }
+    },
+    {
+      "id": "3",
+      "title": "Mars Surface",
+      "description": "High resolution Mars surface imagery",
+      "type": "2D",
+      "category": "2D",
+      "enabled": false,
+      "has3D": false,
+      "tileSource": {
+        "type": "placeholder"
+      }
+    },
+    {
+      "id": "4",
+      "title": "Jupiter's Great Red Spot",
+      "description": "Detailed view of Jupiter's atmospheric storm",
+      "type": "2D",
+      "category": "2D",
+      "enabled": false,
+      "has3D": false,
+      "tileSource": {
+        "type": "placeholder"
+      }
+    },
+    {
+      "id": "5",
+      "title": "Saturn's Rings",
+      "description": "Close-up view of Saturn's ring system",
+      "type": "2D",
+      "category": "2D",
+      "enabled": false,
+      "has3D": false,
+      "tileSource": {
+        "type": "placeholder"
+      }
+    },
+    {
+      "id": "6",
+      "title": "Nebula Collection",
+      "description": "Beautiful nebula formations",
+      "type": "2D",
+      "category": "2D",
+      "enabled": false,
+      "has3D": false,
+      "tileSource": {
+        "type": "placeholder"
+      }
+    },
+    {
+      "id": "7",
+      "title": "Earth from Space",
+      "description": "Interactive 3D Earth model",
+      "type": "2D-3D",
+      "category": "2D and 3D",
+      "enabled": false,
+      "has3D": true,
+      "tileSource": null,
+      "earth3D": {
+        "colorTexture": "/earth_data/earth_color.png",
+        "heightTexture": "/earth_data/earth_height.png",
+        "heightScale": 0.1
+      }
+    },
+    {
+      "id": "8",
+      "title": "Asteroid Belt",
+      "description": "3D visualization of asteroid field",
+      "type": "2D-3D",
+      "category": "2D and 3D",
+      "enabled": false,
+      "has3D": true,
+      "tileSource": null
+    }
+  ]
+}
