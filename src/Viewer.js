@@ -184,23 +184,27 @@ const Viewer = () => {
 
   // Initialize OpenSeadragon viewer
   useEffect(() => {
-    const viewer = OpenSeadragon({
-      id: "openseadragon-viewer",
-      prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
-      tileSources: TILE_SOURCE_CONFIG,
-      showNavigator: true,
-      navigatorPosition: "BOTTOM_RIGHT",
-      navigatorSizeRatio: 0.15,
-      constrainDuringPan: true,
-      visibilityRatio: 0.5,
-    });
+  const container = document.getElementById("openseadragon-viewer");
+  if (!container) return; // prevent running before DOM is ready
 
-    viewerRef.current = viewer;
-    viewer.addHandler("canvas-click", handleCanvasClick);
-    viewer.addHandler("viewport-change", handleViewportChange);
+  const viewer = OpenSeadragon({
+    element: container, // ✅ use the element instead of `id`
+    prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
+    tileSources: TILE_SOURCE_CONFIG,
+    showNavigator: true,
+    navigatorPosition: "BOTTOM_RIGHT",
+    navigatorSizeRatio: 0.15,
+    constrainDuringPan: true,
+    visibilityRatio: 0.5,
+  });
 
-    return () => viewer.destroy();
-  }, [handleCanvasClick, handleViewportChange]);
+  viewerRef.current = viewer;
+  viewer.addHandler("canvas-click", handleCanvasClick);
+  viewer.addHandler("viewport-change", handleViewportChange);
+
+  return () => viewer.destroy();
+}, [handleCanvasClick, handleViewportChange]);
+
 
   // Drag move handler
   const handleDragMove = useCallback((event) => {
@@ -644,35 +648,7 @@ const Viewer = () => {
       ) : (
         <div>
           <h2>3D Collaborative View</h2>
-          {isJoined ? (
-            <CollaborativeThreeScene 
-              collaborationData={{
-                connected,
-                mockMode,
-                currentUser,
-                activeUsers,
-                annotations,
-                userPositions,
-                updatePosition3D,
-                addAnnotation,
-                removeAnnotation
-              }}
-            />
-          ) : (
-            <div style={{ 
-              padding: '40px', 
-              textAlign: 'center',
-              background: 'rgba(255, 255, 255, 0.1)',
-              margin: '20px',
-              borderRadius: '12px',
-              border: '2px dashed #666'
-            }}>
-              <h3>Join a room to enable 3D collaboration</h3>
-              <p style={{ color: '#666' }}>
-                Connect to see other users, their positions, and shared annotations in the 3D space
-              </p>
-            </div>
-          )}
+          <CollaborativeThreeScene />
         </div>
       )}
     </div>
