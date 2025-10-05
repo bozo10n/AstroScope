@@ -108,6 +108,12 @@ const Viewer = () => {
 
   // Initialize OpenSeadragon viewer
   useEffect(() => {
+    // Only initialize when in 2D mode
+    if (show3D) {
+      console.log("In 3D mode, skipping OpenSeadragon initialization");
+      return;
+    }
+
     // Check if the DOM element exists before initializing
     const element = document.getElementById("openseadragon-viewer");
     if (!element) {
@@ -115,28 +121,63 @@ const Viewer = () => {
       return;
     }
 
-    const viewer = OpenSeadragon({
-      id: "openseadragon-viewer",
-      prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
-      tileSources: TILE_SOURCE_CONFIG,
-      showNavigator: true,
-      navigatorPosition: "BOTTOM_RIGHT",
-      navigatorSizeRatio: 0.15,
-      constrainDuringPan: true,
-      visibilityRatio: 0.5,
-    });
+    // Prevent double initialization
+    if (viewerRef.current) {
+      console.log("Viewer already initialized");
+      return;
+    }
 
-    viewerRef.current = viewer;
-    viewer.addHandler("canvas-click", handleCanvasClick);
-    viewer.addHandler("viewport-change", handleViewportChange);
+    console.log("Initializing OpenSeadragon with config:", TILE_SOURCE_CONFIG);
+
+    try {
+      const viewer = OpenSeadragon({
+        id: "openseadragon-viewer",
+        prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
+        tileSources: TILE_SOURCE_CONFIG,
+        showNavigator: true,
+        navigatorPosition: "BOTTOM_RIGHT",
+        navigatorSizeRatio: 0.15,
+        constrainDuringPan: true,
+        visibilityRatio: 0.5,
+        debugMode: false,
+        crossOriginPolicy: false, // Allow cross-origin tiles
+        ajaxWithCredentials: false,
+      });
+
+      viewerRef.current = viewer;
+      
+      // Add error handlers to see what's happening
+      viewer.addHandler("open-failed", (event) => {
+        console.error("❌ OpenSeadragon failed to open:", event);
+      });
+      
+      viewer.addHandler("tile-load-failed", (event) => {
+        console.error("❌ Tile failed to load:", event.tile?.url || event);
+      });
+      
+      viewer.addHandler("open", () => {
+        console.log("✅ OpenSeadragon viewer opened successfully!");
+      });
+      
+      viewer.addHandler("tile-loaded", () => {
+        console.log("✅ Tile loaded");
+      });
+      
+      viewer.addHandler("canvas-click", handleCanvasClick);
+      viewer.addHandler("viewport-change", handleViewportChange);
+    } catch (error) {
+      console.error("❌ Error initializing OpenSeadragon:", error);
+    }
 
     return () => {
-      if (viewer && !viewer.isDestroyed) {
-        viewer.destroy();
+      if (viewerRef.current && !viewerRef.current.isDestroyed) {
+        console.log("Destroying OpenSeadragon viewer");
+        viewerRef.current.destroy();
       }
+      viewerRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only initialize once on mount
+  }, [show3D]); // Reinitialize when switching between 2D/3D
 
   // Drag move handler
   const handleDragMove = useCallback((event) => {
