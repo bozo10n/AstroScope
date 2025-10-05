@@ -102,6 +102,8 @@ const Viewer = () => {
   // this is passed from the /viewer/(id) param
   // use this to get image
   const { id } = useParams(); 
+
+  const navigate = useNavigate();
   
   // Get viewer configuration based on ID
   const viewerData = viewerConfig.viewers.find(v => v.id === id);
@@ -520,6 +522,11 @@ const Viewer = () => {
   if (!viewerData) {
     return (
       <div className="App">
+
+        <header className="header">
+          <button className="launch-button" onClick={() => navigate("/")}>Home</button>
+        </header>
+
         <h1 className="sectionHeader">Space Viewer</h1>
         <div style={{ 
           textAlign: 'center', 
@@ -541,6 +548,10 @@ const Viewer = () => {
 
   return (
     <div className="App">
+        <header className="header">
+          <button className="launch-button" onClick={() => navigate("/")}>Home</button>
+        </header>
+
       <h1 className="sectionHeader">{viewerData.title}</h1>
       {viewerData.description && (
         <p style={{ textAlign: 'center', color: '#aaa', marginTop: '-10px' }}>
