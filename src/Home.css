@@ -1,0 +1,169 @@
+body
+{
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* background star effect*/
+.backgroundStar 
+{
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background-color: white;
+    opacity: 0.7;
+    animation: twinkling 5s infinite;
+    z-index: 1;
+}
+
+@keyframes twinkling 
+{
+    0% 
+    {
+        opacity: 0.7;
+    }
+    50% 
+    {
+        opacity: 0.1;
+    }
+    100% 
+    {
+        opacity: 0.7;
+    }
+}
+
+/* shooting star effect */
+.shootingStar 
+{
+    position: absolute;
+    width: 150px;
+    height: 2px;
+    border-radius: 50%;
+    opacity: 0.8;
+    transform-origin: left center;
+}
+
+.shootingStar.left 
+{
+    background: linear-gradient(90deg, white, rgba(255, 255, 255, 0));
+}
+
+.shootingStar.right 
+{
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), white);
+}
+
+@keyframes shootingLeft 
+{
+    0% 
+    {
+        opacity: 1;
+        transform: translate(0, 0) rotate(-35deg);
+    }
+    100% 
+    {
+        opacity: 0;
+        transform: translate(-1000px, 1000px) rotate(-30deg);
+    }
+}
+
+@keyframes shootingRight 
+{
+    0% 
+    {
+        opacity: 1;
+        transform: translate(0, 0) rotate(35deg);
+    }
+    100% 
+    {
+        opacity: 0;
+        transform: translate(1000px, 1000px) rotate(30deg);
+    }
+}
+
+.home-container {
+  padding: 50px 25px;
+  color: white;
+  text-align: center;
+}
+
+.tiles h2 {
+  font-size: 30px;
+  margin-bottom: 30px;
+}
+
+.tileContainer {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tile {
+  background-color: rgba(64, 119, 165, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-radius: 10px;
+  width: calc(50% - 15px);
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.tile:hover {
+  background-color: rgba(64, 119, 165, 0.05);
+}
+
+.tile-title {
+  font-size: 20px;
+  text-align: left;
+}
+
+/* launch button*/
+
+.launch-button 
+{
+  background: linear-gradient(90deg, rgba(25,79,153,0.8), rgba(64,119,165,0.8));
+  color: white;
+  border: 2px solid rgba(255,255,255,0.5);
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-family: 'Orbitron', sans-serif;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 5px #fff;
+}
+
+.launch-button::before 
+{
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 70%);
+  transform: scale(0);
+  transition: transform 0.5s ease;
+}
+
+.launch-button:hover 
+{
+  background: linear-gradient(90deg, #113b72, #194f99);
+  box-shadow: 0 0 20px #ffffff, 0 0 40px #113b72, 0 0 60px #194f99;
+}
+
+.launch-button:hover::before 
+{
+  transform: scale(1);
+}
+
+.launch-button:active 
+{
+  transform: scale(0.95);
+  box-shadow: 0 0 10px #ffffff, 0 0 20px #113b72;
+}
