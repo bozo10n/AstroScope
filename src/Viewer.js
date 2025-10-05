@@ -11,6 +11,8 @@ import DragPreview from "./components/DragPreview";
 import "./Viewer.css";
 import { useParams } from "react-router-dom";
 
+let shootingStarInterval;
+
 // Constants
 const TILE_SOURCE_CONFIG = {
   width: 10121,
@@ -33,6 +35,80 @@ const VIEWPORT_BOUNDS = {
 };
 
 const Viewer = () => {
+  function applySpaceTheme() {
+    document.body.style.background =
+      "linear-gradient(to right, #09162a, #0d284d, #113b72, #194f99)";
+    createBackgroundStars();
+    startShootingStars();
+  }
+
+  function startShootingStars() {
+    shootingStarInterval = setInterval(() => {
+      if (Math.random() > 0.75) {
+        createShootingStar();
+      }
+    }, 3000);
+  }
+
+  function createBackgroundStars() {
+    const totalStars = 200;
+    for (let i = 0; i < totalStars; i++) {
+      const star = document.createElement("div");
+      star.classList.add("backgroundStar");
+      const x = Math.random() * window.innerWidth - 20;
+      const y = Math.random() * document.documentElement.scrollHeight - 20;
+      star.style.left = x + "px";
+      star.style.top = y + "px";
+      star.style.animationDelay = Math.random() * 5 + "s";
+      document.body.appendChild(star);
+    }
+  }
+
+  function removeBackgroundStars() {
+    const stars = document.querySelectorAll(".backgroundStar");
+    stars.forEach((star) => {
+      document.body.removeChild(star);
+    });
+  }
+
+  function createShootingStar() {
+    const shootingStar = document.createElement("div");
+    shootingStar.classList.add("shootingStar");
+
+    let x = Math.random() > 0.5 ? window.innerWidth - 100 : 100;
+    let y = Math.random() * (document.documentElement.scrollHeight / 2);
+
+    shootingStar.style.left = x + "px";
+    shootingStar.style.top = y + "px";
+
+    if (x > window.innerWidth / 2) {
+      shootingStar.style.animation = "shootingLeft 1.5s linear forwards";
+      shootingStar.classList.add("left");
+    } else {
+      shootingStar.style.animation = "shootingRight 1.5s linear forwards";
+      shootingStar.classList.add("right");
+    }
+
+    document.body.appendChild(shootingStar);
+
+    shootingStar.addEventListener("animationend", () => {
+      if (shootingStar.parentNode) {
+        shootingStar.parentNode.removeChild(shootingStar);
+      }
+    });
+  }
+
+  function stopShootingStars() {
+    clearInterval(shootingStarInterval);
+    const shootingStars = document.querySelectorAll(".shootingStar");
+    shootingStars.forEach((star) => {
+      if (star.parentNode) {
+        star.style.animation = "none";
+        star.parentNode.removeChild(star);
+      }
+    });
+  }
+
   // this is passed from the /viewer/(id) param
   // use this to get image
   const { id } = useParams(); 
@@ -43,9 +119,6 @@ const Viewer = () => {
   // View state
   const [show3D, setShow3D] = useState(false);
   const [viewportVersion, setViewportVersion] = useState(0);
-  
-  // Store annotation overlay elements
-  const annotationOverlaysRef = useRef(new Map());
   
   // Collaboration state
   const [userName, setUserName] = useState("");
@@ -63,9 +136,6 @@ const Viewer = () => {
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragPreview, setDragPreview] = useState(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState(null);
-  
-  // Annotation sidebar visibility
-  const [sidebarVisible, setSidebarVisible] = useState(true);
 
   // Collaboration store
   const {
@@ -88,39 +158,16 @@ const Viewer = () => {
     updateOverlaySize
   } = useCollaborationStore();
 
-  // Prevent pointer lock when in 2D mode
-  useEffect(() => {
-    const preventPointerLock = (e) => {
-      if (!show3D && document.pointerLockElement) {
-        console.warn('Exiting pointer lock - in 2D mode');
-        document.exitPointerLock();
-      }
-    };
-    
-    // Check periodically and on visibility change
-    const interval = setInterval(preventPointerLock, 100);
-    document.addEventListener('visibilitychange', preventPointerLock);
-    document.addEventListener('pointerlockchange', preventPointerLock);
-    
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', preventPointerLock);
-      document.removeEventListener('pointerlockchange', preventPointerLock);
-    };
-  }, [show3D]);
-
   // Canvas click handler
   const handleCanvasClick = useCallback((event) => {
     if (!event.quick || !viewerRef.current) return;
     
     const viewer = viewerRef.current;
-    // Get the viewport point (this is in normalized image coordinates 0-1)
     const viewportPoint = viewer.viewport.pointFromPixel(event.position);
     const viewerElementPoint = viewer.viewport.viewportToViewerElementCoordinates(viewportPoint);
     
     setInputVisible(true);
     setInputPosition({ x: viewerElementPoint.x, y: viewerElementPoint.y });
-    // Store viewport coordinates (0-1 normalized) - these stay fixed relative to the image
     viewer.tempAnnotationLocation = viewportPoint;
   }, []);
 
@@ -132,7 +179,97 @@ const Viewer = () => {
     const center = viewer.viewport.getCenter();
     const zoom = viewer.viewport.getZoom();
     updatePosition(center.x, center.y, zoom);
+    setViewportVersion(v => v + 1);
   }, [isJoined, updatePosition]);
+
+  // Initialize OpenSeadragon viewer
+  useEffect(() => {
+    const viewer = OpenSeadragon({
+      id: "openseadragon-viewer",
+      prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
+      tileSources: TILE_SOURCE_CONFIG,
+      showNavigator: true,
+      navigatorPosition: "BOTTOM_RIGHT",
+      navigatorSizeRatio: 0.15,
+      constrainDuringPan: true,
+      visibilityRatio: 0.5,
+    });
+
+    viewerRef.current = viewer;
+    viewer.addHandler("canvas-click", handleCanvasClick);
+    viewer.addHandler("viewport-change", handleViewportChange);
+
+    return () => viewer.destroy();
+  }, [handleCanvasClick, handleViewportChange]);
+
+  // Drag move handler
+  const handleDragMove = useCallback((event) => {
+    if (!draggedItem || !viewerRef.current) return;
+    
+    const viewer = viewerRef.current;
+    const rect = viewer.element.getBoundingClientRect();
+    
+    const containerPoint = new OpenSeadragon.Point(
+      event.clientX - rect.left,
+      event.clientY - rect.top
+    );
+    
+    const viewportPoint = viewer.viewport.viewerElementToViewportCoordinates(containerPoint);
+    
+    const clampedX = Math.max(VIEWPORT_BOUNDS.MIN, Math.min(VIEWPORT_BOUNDS.MAX, viewportPoint.x));
+    const clampedY = Math.max(VIEWPORT_BOUNDS.MIN, Math.min(VIEWPORT_BOUNDS.MAX, viewportPoint.y));
+    
+    if (draggedItem.type === 'annotation') {
+      updateAnnotationPosition(draggedItem.id, clampedX, clampedY);
+    } else if (draggedItem.type === 'overlay') {
+      updateOverlayPosition(draggedItem.id, clampedX, clampedY);
+    }
+  }, [draggedItem, updateAnnotationPosition, updateOverlayPosition]);
+
+  // Resize move handler
+  const handleResizeMove = useCallback((event) => {
+    if (!draggedItem || !viewerRef.current) return;
+    // TODO: Implement resize logic
+    console.log('Resize move:', event.clientX, event.clientY);
+  }, [draggedItem]);
+
+  // Mouse event handlers for drag and drop
+  useEffect(() => {
+    applySpaceTheme();
+
+    if (!isDragging && !isResizing) return;
+
+    const handleMouseMove = (event) => {
+      if (isDragging) {
+        handleDragMove(event);
+      } else if (isResizing) {
+        handleResizeMove(event);
+      }
+
+      setDragPreview({
+        type: draggedItem?.type || 'dragging',
+        x: event.clientX,
+        y: event.clientY
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setIsResizing(false);
+      setDraggedItem(null);
+      setDragPreview(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      stopShootingStars();
+      removeBackgroundStars();
+    };
+  }, [isDragging, isResizing, draggedItem, handleDragMove, handleResizeMove]);
 
   // Check if user owns the item
   const isOwner = useCallback((item) => {
@@ -169,231 +306,6 @@ const Viewer = () => {
     setIsResizing(true);
     setDraggedItem({ ...overlay, type: 'overlay' });
   }, [isOwner]);
-  
-  // Add/update OpenSeadragon overlays for annotations
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer || show3D || !isJoined) return;
-    
-    const annotations2D = annotations.filter(a => a.z === undefined || a.z === null);
-    
-    // Remove overlays for annotations that no longer exist
-    annotationOverlaysRef.current.forEach((element, annotationId) => {
-      if (!annotations2D.find(a => a.id === annotationId)) {
-        viewer.removeOverlay(element);
-        annotationOverlaysRef.current.delete(annotationId);
-      }
-    });
-    
-    // Add or update overlays for current annotations
-    annotations2D.forEach(annotation => {
-      let element = annotationOverlaysRef.current.get(annotation.id);
-      
-      if (!element) {
-        // Create new overlay element
-        element = document.createElement('div');
-        element.className = 'osd-annotation-overlay';
-        element.id = `annotation-overlay-${annotation.id}`;
-        annotationOverlaysRef.current.set(annotation.id, element);
-        
-        // Add to OpenSeadragon as overlay (this makes it stick to the image!)
-        viewer.addOverlay({
-          element: element,
-          location: new OpenSeadragon.Point(annotation.x, annotation.y),
-          placement: OpenSeadragon.Placement.CENTER
-        });
-      }
-      
-      // Update element content (using ReactDOM is better, but for now use innerHTML)
-      const isOwn = (annotation.user_id || annotation.userId) === currentUser.id;
-      element.innerHTML = `
-        <div class="annotation-marker-osd ${isDragging && draggedItem?.id === annotation.id ? 'being-dragged' : ''}" 
-             data-annotation-id="${annotation.id}"
-             style="pointer-events: auto; cursor: ${isOwn ? 'move' : 'pointer'};">
-          📌
-          <div class="annotation-popup-osd">
-            <div class="annotation-user">${annotation.user_name || annotation.userName || 'Unknown User'}</div>
-            <div class="annotation-text">${annotation.text}</div>
-            ${isOwn ? `<button class="annotation-delete-btn-osd" onclick="window.deleteAnnotation('${annotation.id}')">🗑️ Delete</button>` : ''}
-          </div>
-        </div>
-      `;
-      
-      // Add event listeners
-      const markerEl = element.querySelector('.annotation-marker-osd');
-      if (markerEl) {
-        markerEl.onclick = (e) => {
-          e.stopPropagation();
-          setSelectedAnnotation(annotation);
-        };
-        
-        if (isOwn) {
-          markerEl.onmousedown = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            startDragAnnotation(annotation, e);
-          };
-        }
-      }
-    });
-    
-  }, [annotations, show3D, isJoined, currentUser.id, isDragging, draggedItem, startDragAnnotation]);
-  
-  // Global delete function for annotations
-  useEffect(() => {
-    window.deleteAnnotation = (annotationId) => {
-      if (window.confirm('Delete this annotation?')) {
-        removeAnnotation(annotationId);
-      }
-    };
-    return () => {
-      delete window.deleteAnnotation;
-    };
-  }, [removeAnnotation]);
-
-  // Initialize OpenSeadragon viewer
-  useEffect(() => {
-    // Only initialize when in 2D mode
-    if (show3D) {
-      console.log("In 3D mode, skipping OpenSeadragon initialization");
-      return;
-    }
-
-    // Check if the DOM element exists before initializing
-    const element = document.getElementById("openseadragon-viewer");
-    if (!element) {
-      console.warn("OpenSeadragon viewer element not found, skipping initialization");
-      return;
-    }
-
-    // Prevent double initialization
-    if (viewerRef.current) {
-      console.log("Viewer already initialized");
-      return;
-    }
-
-    console.log("Initializing OpenSeadragon with config:", TILE_SOURCE_CONFIG);
-
-    try {
-      const viewer = OpenSeadragon({
-        id: "openseadragon-viewer",
-        prefixUrl: "https://openseadragon.github.io/openseadragon/images/",
-        tileSources: TILE_SOURCE_CONFIG,
-        showNavigator: true,
-        navigatorPosition: "BOTTOM_RIGHT",
-        navigatorSizeRatio: 0.15,
-        constrainDuringPan: true,
-        visibilityRatio: 0.5,
-        debugMode: false,
-        crossOriginPolicy: false, // Allow cross-origin tiles
-        ajaxWithCredentials: false,
-      });
-
-      viewerRef.current = viewer;
-      
-      // Add error handlers to see what's happening
-      viewer.addHandler("open-failed", (event) => {
-        console.error("❌ OpenSeadragon failed to open:", event);
-      });
-      
-      viewer.addHandler("tile-load-failed", (event) => {
-        console.error("❌ Tile failed to load:", event.tile?.url || event);
-      });
-      
-      viewer.addHandler("open", () => {
-        console.log("✅ OpenSeadragon viewer opened successfully!");
-      });
-      
-      viewer.addHandler("tile-loaded", () => {
-        console.log("✅ Tile loaded");
-      });
-      
-      viewer.addHandler("canvas-click", handleCanvasClick);
-      viewer.addHandler("viewport-change", handleViewportChange);
-    } catch (error) {
-      console.error("❌ Error initializing OpenSeadragon:", error);
-    }
-
-    return () => {
-      if (viewerRef.current && !viewerRef.current.isDestroyed) {
-        console.log("Destroying OpenSeadragon viewer");
-        viewerRef.current.destroy();
-      }
-      viewerRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [show3D]); // Reinitialize when switching between 2D/3D
-
-  // Drag move handler
-  const handleDragMove = useCallback((event) => {
-    if (!draggedItem || !viewerRef.current || !isDragging) return;
-    
-    const viewer = viewerRef.current;
-    const rect = viewer.element.getBoundingClientRect();
-    
-    const containerPoint = new OpenSeadragon.Point(
-      event.clientX - rect.left,
-      event.clientY - rect.top
-    );
-    
-    const viewportPoint = viewer.viewport.viewerElementToViewportCoordinates(containerPoint);
-    
-    const clampedX = Math.max(VIEWPORT_BOUNDS.MIN, Math.min(VIEWPORT_BOUNDS.MAX, viewportPoint.x));
-    const clampedY = Math.max(VIEWPORT_BOUNDS.MIN, Math.min(VIEWPORT_BOUNDS.MAX, viewportPoint.y));
-    
-    if (draggedItem.type === 'annotation') {
-      updateAnnotationPosition(draggedItem.id, clampedX, clampedY);
-      
-      // Update OpenSeadragon overlay position immediately
-      const element = annotationOverlaysRef.current.get(draggedItem.id);
-      if (element) {
-        viewer.updateOverlay(element, new OpenSeadragon.Point(clampedX, clampedY));
-      }
-    } else if (draggedItem.type === 'overlay') {
-      updateOverlayPosition(draggedItem.id, clampedX, clampedY);
-    }
-  }, [draggedItem, isDragging, updateAnnotationPosition, updateOverlayPosition]);
-
-  // Resize move handler
-  const handleResizeMove = useCallback((event) => {
-    if (!draggedItem || !viewerRef.current) return;
-    // TODO: Implement resize logic
-    console.log('Resize move:', event.clientX, event.clientY);
-  }, [draggedItem]);
-
-  // Mouse event handlers for drag and drop
-  useEffect(() => {
-    if (!isDragging && !isResizing) return;
-
-    const handleMouseMove = (event) => {
-      if (isDragging) {
-        handleDragMove(event);
-      } else if (isResizing) {
-        handleResizeMove(event);
-      }
-
-      setDragPreview({
-        type: draggedItem?.type || 'dragging',
-        x: event.clientX,
-        y: event.clientY
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      setIsResizing(false);
-      setDraggedItem(null);
-      setDragPreview(null);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, isResizing, draggedItem, handleDragMove, handleResizeMove]);
 
   // Toolbar handlers
   const handleZoomIn = useCallback(() => {
@@ -419,7 +331,7 @@ const Viewer = () => {
     }
   }, []);
 
-  // Convert viewport coordinates to pixel coordinates for overlays (used for image overlays, not annotations)
+  // Convert viewport coordinates to pixel coordinates for overlays
   const getOverlayStyle = useCallback((item) => {
     const viewer = viewerRef.current;
     if (!viewer?.viewport) return { display: 'none' };
@@ -506,111 +418,6 @@ const Viewer = () => {
     setUserName("");
   }, []);
 
-  // Handle jump to annotation
-  const handleJumpToAnnotation = useCallback((annotation) => {
-    if (!viewerRef.current) return;
-    
-    const viewer = viewerRef.current;
-    const point = new OpenSeadragon.Point(annotation.x, annotation.y);
-    
-    // Smoothly pan to the annotation
-    viewer.viewport.panTo(point, true);
-    viewer.viewport.zoomTo(viewer.viewport.getMaxZoom() * 0.5, point, true);
-  }, []);
-
-  // Render annotation list sidebar
-  const renderAnnotationList = () => {
-    const annotations2D = annotations.filter(a => a.z === undefined || a.z === null);
-    
-    return (
-      <>
-        {/* Toggle button - always visible */}
-        <button
-          className="annotation-sidebar-toggle"
-          onClick={() => setSidebarVisible(!sidebarVisible)}
-          title={sidebarVisible ? "Hide annotations list" : "Show annotations list"}
-        >
-          {sidebarVisible ? '◀' : '▶'} {!sidebarVisible && `📍 ${annotations2D.length}`}
-        </button>
-        
-        {/* Sidebar - conditionally visible */}
-        {sidebarVisible && (
-          <div className="annotation-list-sidebar">
-            <div className="annotation-list-header">
-              <div className="annotation-list-title">
-                <span>📍</span>
-                <span>Annotations</span>
-              </div>
-              <div className="annotation-list-count">{annotations2D.length}</div>
-            </div>
-        
-        {annotations2D.length === 0 ? (
-          <div className="annotation-list-empty">
-            No annotations yet.<br/>
-            Click on the image to create one.
-          </div>
-        ) : (
-          <div>
-            {annotations2D.map((annotation) => {
-              const isOwn = (annotation.user_id || annotation.userId) === currentUser.id;
-              
-              return (
-                <div 
-                  key={annotation.id}
-                  className={`annotation-list-item ${isOwn ? 'own' : ''}`}
-                  onClick={() => handleJumpToAnnotation(annotation)}
-                >
-                  <div className="annotation-list-item-header">
-                    <div className="annotation-list-item-text">
-                      {annotation.text}
-                    </div>
-                    {isOwn && (
-                      <span className="annotation-list-item-badge">You</span>
-                    )}
-                  </div>
-                  
-                  <div className="annotation-list-item-meta">
-                    <div className="annotation-list-item-user">
-                      <span>👤</span>
-                      <span>{annotation.user_name || annotation.userName || 'Unknown'}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="annotation-list-item-actions">
-                    <button 
-                      className="annotation-list-item-btn jump"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleJumpToAnnotation(annotation);
-                      }}
-                    >
-                      🎯 Jump to Location
-                    </button>
-                    {isOwn && (
-                      <button 
-                        className="annotation-list-item-btn delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (window.confirm(`Delete annotation "${annotation.text}"?`)) {
-                            removeAnnotation(annotation.id);
-                          }
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-          </div>
-        )}
-      </>
-    );
-  };
-
   // Render collaboration panel
   const renderCollaborationPanel = () => (
     <div className="collaboration-panel">
@@ -689,21 +496,11 @@ const Viewer = () => {
 
   return (
     <div className="App">
-      <h1>Space Viewer</h1>
+      <h1 className="sectionHeader ">Space Viewer</h1>
       
       {renderCollaborationPanel()}
 
-      <button onClick={() => {
-        // Exit pointer lock before switching views
-        if (document.pointerLockElement) {
-          document.exitPointerLock();
-        }
-        
-        // Small delay to ensure pointer lock is fully released before switching
-        setTimeout(() => {
-          setShow3D(!show3D);
-        }, 100);
-      }}>
+      <button onClick={() => setShow3D(!show3D)} className="viewerButton">
         {show3D ? "Show 2D View" : "Show 3D View"}
       </button>
 
@@ -728,25 +525,30 @@ const Viewer = () => {
                 zIndex: 1
               }}
             />
+            
+            {/* Annotation and overlay container - positioned above OpenSeadragon but below UI controls */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              pointerEvents: "none",
+              zIndex: 10
+            }}>
+              {isJoined && annotations.map(annotation => (
+                <AnnotationMarker
+                  key={`${annotation.id}-${viewportVersion}`}
+                  annotation={annotation}
+                  currentUserId={currentUser.id}
+                  onSelect={setSelectedAnnotation}
+                  onRemove={removeAnnotation}
+                  onStartDrag={startDragAnnotation}
+                  isDragging={isDragging && draggedItem?.id === annotation.id}
+                  style={getOverlayStyle(annotation)}
+                />
+              ))}
 
-            {/* Annotation List Sidebar */}
-            {isJoined && renderAnnotationList()}
-            
-            {/* Annotations are now managed by OpenSeadragon overlay system - see useEffect above */}
-            
-            {/* Overlay container for image overlays (not annotations) */}
-            <div 
-              id="overlay-container"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                pointerEvents: "none",
-                zIndex: 10
-              }}
-            >
               {isJoined && overlays.map(overlay => (
                 <ImageOverlay
                   key={`${overlay.id}-${viewportVersion}`}

@@ -96,10 +96,10 @@ const Home = () => {
 
   return (
     <div className="home-container">
-      <h1>Title Here</h1>
+      <h1 className="pageTitle">AstroScope</h1>
 
       <section className="tiles">
-        <h2>Popular</h2>
+        <h2 className="sectionHeader">Popular</h2>
         <div className="tileContainer">
           <div className="tile">
             <span className="tile-title">Tile 1</span>
@@ -145,7 +145,7 @@ const Home = () => {
       </section>
 
       <section className="tiles">
-        <h2>Recent</h2>
+        <h2 className="sectionHeader">Recent</h2>
         <div className="tileContainer">
           <div className="tile">
             <span className="tile-title">Tile 1</span>
